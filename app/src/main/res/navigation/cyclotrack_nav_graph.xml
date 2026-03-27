@@ -20,6 +20,11 @@
         android:name="com.kvl.cyclotrack.TripDetailsActivity"
         android:label="Trip Details Activity"
         tools:layout="@layout/activity_trip_details" />
+    <activity
+        android:id="@+id/RouteDetailsActivity"
+        android:name="com.kvl.cyclotrack.RouteDetailsActivity"
+        android:label="Route Details Activity"
+        tools:layout="@layout/activity_route_details" />
     <fragment
         android:id="@+id/AnalyticsFragment"
         android:name="com.kvl.cyclotrack.AnalyticsFragment"
@@ -61,6 +66,21 @@
             app:destination="@id/TripDetailsActivity">
             <argument
                 android:name="tripId"
+                android:defaultValue="-1L"
+                app:argType="long" />
+        </action>
+    </fragment>
+    <fragment
+        android:id="@+id/RoutesFragment"
+        android:name="com.kvl.cyclotrack.RoutesFragment"
+        android:label="@string/routes_fragment_label"
+        tools:layout="@layout/fragment_routes">
+
+        <action
+            android:id="@+id/action_view_route_details"
+            app:destination="@id/RouteDetailsActivity">
+            <argument
+                android:name="routeId"
                 android:defaultValue="-1L"
                 app:argType="long" />
         </action>

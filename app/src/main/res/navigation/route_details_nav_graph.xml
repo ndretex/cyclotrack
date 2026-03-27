@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/route_details_nav_graph"
+    app:startDestination="@id/RouteDetailsFragment">
+
+    <activity
+        android:id="@+id/MainActivity"
+        android:name="com.kvl.cyclotrack.MainActivity"
+        android:label="MainActivity"
+        tools:layout="@layout/activity_main" />
+
+    <fragment
+        android:id="@+id/RouteDetailsFragment"
+        android:name="com.kvl.cyclotrack.RouteDetailsFragment"
+        android:label="@string/route_details_fragment_label"
+        tools:layout="@layout/fragment_route_details">
+        <argument
+            android:name="routeId"
+            android:defaultValue="-1L"
+            app:argType="long" />
+    </fragment>
+</navigation>

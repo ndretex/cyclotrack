@@ -313,6 +313,7 @@ class MainActivity : AppCompatActivity() {
                 setOf(
                     R.id.AnalyticsFragment,
                     R.id.TripSummariesFragment,
+                    R.id.RoutesFragment,
                     R.id.BiometricsPreferenceFragment
                 )
             )

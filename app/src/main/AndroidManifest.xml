@@ -115,6 +115,9 @@ provider
             android:name=".TripDetailsActivity"
             android:exported="true" />
         <activity
+            android:name=".RouteDetailsActivity"
+            android:exported="true" />
+        <activity
             android:name=".DashboardActivity"
             android:exported="true" />
         <activity

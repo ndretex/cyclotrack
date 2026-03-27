@@ -403,6 +403,43 @@ val MIGRATION_28_27 = object : Migration(28, 27) {
     }
 }
 
+val MIGRATION_28_29 = object : Migration(28, 29) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS `Route` (
+            `name` TEXT NOT NULL,
+            `description` TEXT,
+            `source` TEXT,
+            `createdAt` INTEGER NOT NULL,
+            `distance` REAL,
+            `ascent` REAL,
+            `descent` REAL,
+            `hasTimestamps` INTEGER NOT NULL,
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT)"""
+        )
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS `RoutePoint` (
+            `routeId` INTEGER NOT NULL,
+            `sequence` INTEGER NOT NULL,
+            `latitude` REAL NOT NULL,
+            `longitude` REAL NOT NULL,
+            `elevation` REAL,
+            `timestamp` INTEGER,
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT,
+            FOREIGN KEY(`routeId`) REFERENCES `Route`(`id`) ON DELETE CASCADE)"""
+        )
+        db.execSQL("CREATE INDEX index_RoutePoint_routeId ON RoutePoint(`routeId`)")
+        db.execSQL("CREATE UNIQUE INDEX index_RoutePoint_routeId_sequence ON RoutePoint(`routeId`, `sequence`)")
+    }
+}
+
+val MIGRATION_29_28 = object : Migration(29, 28) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("DROP TABLE RoutePoint")
+        db.execSQL("DROP TABLE Route")
+    }
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object TripsDatabaseModule {
@@ -441,7 +478,9 @@ object TripsDatabaseModule {
                 MIGRATION_25_26,
                 MIGRATION_26_27,
                 MIGRATION_27_28,
-                MIGRATION_28_27
+                MIGRATION_28_27,
+                MIGRATION_28_29,
+                MIGRATION_29_28
             )
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onOpen(db: SupportSQLiteDatabase) {
@@ -495,6 +534,18 @@ object TripsDatabaseModule {
     @Singleton
     fun provideBikeDao(db: TripsDatabase): BikeDao {
         return db.bikeDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideRouteDao(db: TripsDatabase): RouteDao {
+        return db.routeDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideRoutePointDao(db: TripsDatabase): RoutePointDao {
+        return db.routePointDao()
     }
 
     @Provides

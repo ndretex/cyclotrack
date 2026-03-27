@@ -3,5 +3,6 @@
 
     <item android:title="Stats" android:icon="@drawable/ic_analytics" android:id="@id/AnalyticsFragment" />
     <item android:title="Rides" android:icon="@drawable/ic_list_alt" android:id="@id/TripSummariesFragment" />
+    <item android:title="Routes" android:icon="@drawable/baseline_explore_24" android:id="@id/RoutesFragment" />
     <item android:title="Profile" android:icon="@drawable/ic_person" android:id="@id/BiometricsPreferenceFragment" />
 </menu>

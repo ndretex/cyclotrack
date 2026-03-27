@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".RouteDetailsFragment">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <com.google.android.gms.maps.MapView
+            android:id="@+id/route_details_map_view"
+            android:layout_width="match_parent"
+            android:layout_height="280dp"
+            android:contentDescription="@string/trip_summary_image_description" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/route_details_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:textAppearance="?attr/textAppearanceHeadlineSmall"
+                    android:textStyle="bold"
+                    tools:text="Saturday route" />
+
+                <ImageButton
+                    android:id="@+id/route_details_edit_button"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/route_detail_rename_button"
+                    android:padding="8dp"
+                    app:srcCompat="@drawable/ic_edit_black_24" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/route_details_imported_at"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                tools:text="Imported today" />
+
+            <TextView
+                android:id="@+id/route_details_description"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textAppearance="?attr/textAppearanceBodyLarge"
+                tools:text="A scenic route saved for a future ride." />
+
+            <TextView
+                android:id="@+id/route_details_source_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                tools:text="Source: Komoot" />
+
+            <com.kvl.cyclotrack.widgets.HeadingView
+                android:id="@+id/route_details_distance_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                app:headingLabel="@string/route_detail_distance_label"
+                app:iconSrc="@drawable/ic_ruler" />
+
+            <com.kvl.cyclotrack.widgets.HeadingView
+                android:id="@+id/route_details_points_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:headingLabel="@string/route_detail_points_label"
+                app:iconSrc="@drawable/ic_list_alt" />
+
+            <com.kvl.cyclotrack.widgets.HeadingView
+                android:id="@+id/route_details_type_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:headingLabel="@string/route_detail_type_label"
+                app:iconSrc="@drawable/ic_baseline_360_24" />
+
+            <com.kvl.cyclotrack.widgets.HeadingView
+                android:id="@+id/route_details_ascent_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                app:headingLabel="@string/route_detail_ascent_label"
+                app:iconSrc="@drawable/ic_long_arrow_up" />
+
+            <com.kvl.cyclotrack.widgets.HeadingView
+                android:id="@+id/route_details_descent_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:headingLabel="@string/route_detail_descent_label"
+                app:iconSrc="@drawable/ic_mountains" />
+
+            <com.kvl.cyclotrack.widgets.HeadingView
+                android:id="@+id/route_details_elevation_range_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:headingLabel="@string/route_detail_elevation_range_label"
+                app:iconSrc="@drawable/ic_mountains" />
+
+            <com.kvl.cyclotrack.widgets.HeadingView
+                android:id="@+id/route_details_steepest_climb_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                app:headingLabel="@string/route_detail_steepest_climb_label"
+                app:iconSrc="@drawable/ic_long_arrow_up" />
+
+            <com.kvl.cyclotrack.widgets.HeadingView
+                android:id="@+id/route_details_steepest_descent_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:headingLabel="@string/route_detail_steepest_descent_label"
+                app:iconSrc="@drawable/ic_baseline_arrow_right_alt_24" />
+
+            <TextView
+                android:id="@+id/route_details_elevation_chart_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:text="@string/route_detail_elevation_profile_label"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/route_details_elevation_chart"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:contentDescription="@string/route_detail_elevation_profile_label" />
+
+            <TextView
+                android:id="@+id/route_details_grade_chart_heading"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:text="@string/route_detail_grade_profile_label"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textStyle="bold" />
+
+            <ImageView
+                android:id="@+id/route_details_grade_chart"
+                android:layout_width="match_parent"
+                android:layout_height="220dp"
+                android:contentDescription="@string/route_detail_grade_profile_label" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>
