@@ -28,8 +28,10 @@ import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.ViewCompat
 import androidx.core.view.doOnPreDraw
 import androidx.core.view.setPadding
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
@@ -416,6 +418,21 @@ class TripInProgressFragment :
             leftMargin = safeZone.left
             rightMargin = safeZone.right
         }
+        val initialPaddingLeft = view.paddingLeft
+        val initialPaddingTop = view.paddingTop
+        val initialPaddingRight = view.paddingRight
+        val initialPaddingBottom = view.paddingBottom
+        ViewCompat.setOnApplyWindowInsetsListener(view) { v, insets ->
+            val systemBarsInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.updatePadding(
+                left = initialPaddingLeft + systemBarsInsets.left,
+                top = initialPaddingTop + systemBarsInsets.top,
+                right = initialPaddingRight + systemBarsInsets.right,
+                bottom = initialPaddingBottom + systemBarsInsets.bottom
+            )
+            insets
+        }
+        ViewCompat.requestApplyInsets(view)
 
         Log.d(logTag, "TripInProgressFragment::onViewCreated")
         FirebaseAnalytics.getInstance(requireContext()).logEvent("EnterDashboard") {}

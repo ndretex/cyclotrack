@@ -6,6 +6,10 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.navigation.findNavController
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -21,8 +25,19 @@ class PreferencesActivity : AppCompatActivity() {
     val logTag: String = this.javaClass.simpleName
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         Log.d(logTag, "onCreate")
         setContentView(R.layout.activity_preferences)
+        findViewById<com.google.android.material.appbar.AppBarLayout>(R.id.app_bar_preferences)
+            .let { appBar ->
+                val initialTopPadding = appBar.paddingTop
+                ViewCompat.setOnApplyWindowInsetsListener(appBar) { view, insets ->
+                    val topInset = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+                    view.updatePadding(top = initialTopPadding + topInset)
+                    insets
+                }
+                ViewCompat.requestApplyInsets(appBar)
+            }
         findNavController(R.id.nav_host_fragment_preferences).setGraph(
             R.navigation.preferences_nav_graph,
             intent.extras

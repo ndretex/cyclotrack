@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
 import androidx.navigation.findNavController
 import com.kvl.cyclotrack.events.BluetoothActionEvent
 import dagger.hilt.android.AndroidEntryPoint
@@ -14,6 +15,7 @@ import org.greenrobot.eventbus.Subscribe
 class DashboardActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         Log.d(this.javaClass.simpleName, "onCreate")
         setContentView(R.layout.activity_dashboard)
         findNavController(R.id.nav_host_fragment_dashboard).setGraph(

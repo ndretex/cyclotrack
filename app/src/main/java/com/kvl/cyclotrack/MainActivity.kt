@@ -13,6 +13,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.findNavController
 import androidx.navigation.ui.setupWithNavController
@@ -241,6 +245,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         Log.d(logTag, "onCreate")
         title = ""
         when (intent.getStringExtra("destinationView")) {
@@ -250,6 +255,26 @@ class MainActivity : AppCompatActivity() {
 
             else -> setContentView(R.layout.activity_main)
         }
+        findViewById<com.google.android.material.appbar.AppBarLayout>(R.id.app_bar_main)
+            .let { appBar ->
+            val initialTopPadding = appBar.paddingTop
+            ViewCompat.setOnApplyWindowInsetsListener(appBar) { view, insets ->
+                val topInset = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+                view.updatePadding(top = initialTopPadding + topInset)
+                insets
+            }
+            ViewCompat.requestApplyInsets(appBar)
+        }
+        findViewById<com.google.android.material.bottomappbar.BottomAppBar>(R.id.main_activity_bottomAppBar)
+            .let { bottomAppBar ->
+                val initialBottomPadding = bottomAppBar.paddingBottom
+                ViewCompat.setOnApplyWindowInsetsListener(bottomAppBar) { view, insets ->
+                    val bottomInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+                    view.updatePadding(bottom = initialBottomPadding + bottomInset)
+                    insets
+                }
+                ViewCompat.requestApplyInsets(bottomAppBar)
+            }
         setSupportActionBar(findViewById(R.id.toolbar_main))
         googleFitApiService = GoogleFitApiService(this)
 

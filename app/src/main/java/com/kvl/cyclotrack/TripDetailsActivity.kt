@@ -2,6 +2,10 @@ package com.kvl.cyclotrack
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.navigation.findNavController
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -9,7 +13,18 @@ import dagger.hilt.android.AndroidEntryPoint
 class TripDetailsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         setContentView(R.layout.activity_trip_details)
+        findViewById<com.google.android.material.appbar.AppBarLayout>(R.id.appBar_tripDetails)
+            .let { appBar ->
+                val initialTopPadding = appBar.paddingTop
+                ViewCompat.setOnApplyWindowInsetsListener(appBar) { view, insets ->
+                    val topInset = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+                    view.updatePadding(top = initialTopPadding + topInset)
+                    insets
+                }
+                ViewCompat.requestApplyInsets(appBar)
+            }
         findNavController(R.id.nav_host_fragment_tripDetails).setGraph(
             R.navigation.trip_details_nav_graph,
             intent.extras
