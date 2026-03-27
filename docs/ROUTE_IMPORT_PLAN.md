@@ -1,6 +1,6 @@
 # Routes, GPX, And FIT Import Architecture Plan
 
-Status: Draft for review before implementation
+Status: Implemented
 
 This document supersedes the earlier idea of importing route/activity files directly into the existing `Trip` model as the default V1 approach.
 
