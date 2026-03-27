@@ -15,7 +15,12 @@ plugins {
 def homePath = System.properties["user.home"]
 def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
-keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+def hasKeystoreProperties = keystorePropertiesFile.exists()
+if (hasKeystoreProperties) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+} else {
+    logger.lifecycle("keystore.properties not found; release/prod builds will use debug signing for local development.")
+}
 
 kotlin {
     jvmToolchain(17)
@@ -32,10 +37,12 @@ android {
     }
     signingConfigs {
         Default {
-            storeFile rootProject.file(keystoreProperties["storeFile"])
-            storePassword keystoreProperties["storePassword"]
-            keyPassword keystoreProperties["keyPassword"]
-            keyAlias keystoreProperties["keyAlias"]
+            if (hasKeystoreProperties) {
+                storeFile rootProject.file(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+                keyPassword keystoreProperties["keyPassword"]
+                keyAlias keystoreProperties["keyAlias"]
+            }
         }
         debug {
             storeFile file(homePath + "/.android/debug.keystore")
@@ -114,7 +121,7 @@ android {
     buildTypes {
         release {
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
-            signingConfig signingConfigs.Default
+            signingConfig hasKeystoreProperties ? signingConfigs.Default : signingConfigs.debug
             debuggable true
         }
         debug {
@@ -129,7 +136,7 @@ android {
         prod {
             minifyEnabled true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
-            signingConfig signingConfigs.Default
+            signingConfig hasKeystoreProperties ? signingConfigs.Default : signingConfigs.debug
         }
     }
     testOptions {

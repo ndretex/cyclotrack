@@ -89,24 +89,38 @@ class GpsService @Inject constructor(context: Application) : LiveData<Location>(
             return
         }
 
-        if (BuildConfig.BUILD_TYPE == "debug") {
+        if (BuildConfig.BUILD_TYPE == "debug" &&
+            locationManager.allProviders.contains(FAKE_LOCATION_PROVIDER)
+        ) {
             Log.d(logTag, "Registering fake location provider")
-            locationManager.requestLocationUpdates(
-                "fakeLocationProvider",
-                1000L,
-                1f,
-                locationListener
-            )
+            requestLocationUpdates(FAKE_LOCATION_PROVIDER)
         } else {
             Log.d(logTag, "Registering GPS location provider")
-            //This can safely be called multiple times, will only be registered once
+            requestLocationUpdates(LocationManager.GPS_PROVIDER)
+        }
+    }
+
+    private fun requestLocationUpdates(provider: String) {
+        // This can safely be called multiple times; LocationManager deduplicates listener/provider pairs.
+        try {
             locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
+                provider,
                 1000L,
                 1f,
                 locationListener
             )
-
+        } catch (e: IllegalArgumentException) {
+            Log.e(logTag, "Location provider $provider is unavailable", e)
+            if (provider != LocationManager.GPS_PROVIDER) {
+                Log.d(logTag, "Falling back to GPS provider")
+                requestLocationUpdates(LocationManager.GPS_PROVIDER)
+            } else {
+                accessGranted.value = false
+            }
         }
+    }
+
+    companion object {
+        private const val FAKE_LOCATION_PROVIDER = "fakeLocationProvider"
     }
 }

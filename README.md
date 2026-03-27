@@ -118,7 +118,11 @@ The project configures:
 
 #### `keystore.properties`
 
-This file is required during Gradle configuration because `app/build.gradle` loads it unconditionally, even if you only intend to build `debug` or `dev`.
+This file is optional for local development.
+
+- If present, `release` and `prod` use the configured signing key.
+- If missing, Gradle still configures successfully and `release`/`prod` fall back to debug signing for local builds.
+- For Play Store or other production distribution, provide a real release keystore via this file.
 
 Create `keystore.properties` in the repository root:
 
@@ -166,8 +170,8 @@ The app defines four build types:
 
 - `debug`: debuggable, application id suffix `.debug`
 - `dev`: debuggable, application id suffix `.dev`
-- `release`: signed with `keystore.properties`
-- `prod`: minified production build signed with `keystore.properties`
+- `release`: uses `keystore.properties` when present, otherwise debug signing for local builds
+- `prod`: minified production build; uses `keystore.properties` when present, otherwise debug signing for local builds
 
 The codebase also uses `FeatureFlags` to treat `debug` and `dev` as development builds.
 

@@ -198,7 +198,12 @@ class LineGraph(
         width: Int,
         height: Int,
         step: Boolean
-    ) {
+    ): Boolean {
+        if (dataset.points1.isEmpty() || dataset.points2.isEmpty()) {
+            Log.w("LineGraph", "Skipping area draw because one or more point lists are empty")
+            return false
+        }
+
         val xScale = width / (dataset.xAxisWidth ?: 1f)
         val yScale = height / (dataset.yAxisHeight ?: 1f)
 
@@ -224,8 +229,10 @@ class LineGraph(
                     step
                 ), dataset.paint ?: greenPaint
             )
+            return true
         } catch (e: Exception) {
             Log.e("LineGraph", "Could not draw area", e)
+            return false
         }
     }
 
@@ -235,7 +242,12 @@ class LineGraph(
         width: Int,
         height: Int,
         step: Boolean
-    ) {
+    ): Boolean {
+        if (dataset.points.isEmpty()) {
+            Log.w("LineGraph", "Skipping line draw because point list is empty")
+            return false
+        }
+
         val xScale = width / (dataset.xAxisWidth ?: 1f)
         val yScale = height / (dataset.yAxisHeight ?: 1f)
         canvas.drawPath(
@@ -265,6 +277,22 @@ class LineGraph(
                 fill
             )
         }
+        return true
+    }
+
+    private fun drawNoDataPlaceholder(canvas: Canvas, width: Int, height: Int) {
+        val message = "Not enough data"
+        val fill = Paint(textPaintFill).apply {
+            textAlign = Paint.Align.CENTER
+            textSize = 42f
+        }
+        val stroke = Paint(textPaintStroke).apply {
+            textAlign = Paint.Align.CENTER
+            textSize = 42f
+        }
+        val y = (height / 2f) - getTextMiddle(fill, message)
+        canvas.drawText(message, width / 2f, y, stroke)
+        canvas.drawText(message, width / 2f, y, fill)
     }
 
     private fun drawBorders(canvas: Canvas, borders: Int, width: Int, height: Int) {
@@ -330,23 +358,27 @@ class LineGraph(
         val height: Int =
             bounds.height() - if (xLabels != null) getXLabelHeight(xLabels).toInt() + 2 else 0
 
+        var drewAnyData = false
         areas?.forEach { area ->
-            drawArea(
+            drewAnyData = drawArea(
                 canvas,
                 area,
                 width,
                 height,
                 step
-            )
+            ) || drewAnyData
         }
         datasets.forEach { dataset ->
-            drawPath(
+            drewAnyData = drawPath(
                 canvas,
                 dataset,
                 width,
                 height,
                 step
-            )
+            ) || drewAnyData
+        }
+        if (!drewAnyData) {
+            drawNoDataPlaceholder(canvas, width, height)
         }
         if (yLabels != null) drawYLabels(canvas, yLabels, width, height)
         if (xLabels != null) drawXLabels(canvas, xLabels, width, height)
