@@ -35,6 +35,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class TripSummariesFragment @Inject constructor() : Fragment() {
     private val logTag = "TripSummariesFragment"
+    private val listStateKey = "trip_list_state"
     private val viewModel: TripSummariesViewModel by navGraphViewModels(R.id.cyclotrack_nav_graph) {
         defaultViewModelProviderFactory
     }
@@ -103,9 +104,9 @@ class TripSummariesFragment @Inject constructor() : Fragment() {
         val listState: Parcelable? =
             when {
                 (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ->
-                    savedInstanceState?.getParcelable("MY_KEY", Bundle::class.java)
+                    savedInstanceState?.getParcelable(listStateKey, Parcelable::class.java)
 
-                else -> @Suppress("DEPRECATION") savedInstanceState?.getParcelable("MY_KEY")
+                else -> @Suppress("DEPRECATION") savedInstanceState?.getParcelable(listStateKey)
             }
         if (listState != null) viewManager.onRestoreInstanceState(listState)
 
@@ -313,7 +314,7 @@ class TripSummariesFragment @Inject constructor() : Fragment() {
     override fun onPause() {
         super.onPause()
         viewModel.tripListState.putParcelable(
-            "MY_KEY",
+            listStateKey,
             tripListView.layoutManager?.onSaveInstanceState()
         )
     }
@@ -325,7 +326,7 @@ class TripSummariesFragment @Inject constructor() : Fragment() {
                 (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) ->
                     tripListView.layoutManager?.onRestoreInstanceState(
                         viewModel.tripListState.getParcelable(
-                            "MY_KEY", Bundle::class.java
+                            listStateKey, Parcelable::class.java
                         )
                     )
 
@@ -333,7 +334,7 @@ class TripSummariesFragment @Inject constructor() : Fragment() {
                     @Suppress("DEPRECATION")
                     tripListView.layoutManager?.onRestoreInstanceState(
                         viewModel.tripListState.getParcelable(
-                            "MY_KEY"
+                            listStateKey
                         )
                     )
             }
