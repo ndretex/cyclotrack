@@ -17,7 +17,7 @@ Cyclotrack combines a live, in-ride dashboard with post-ride analysis and export
 - Track bikes and associate rides with equipment.
 - Link BLE heart rate, cadence, and speed sensors.
 - Optionally auto-pause and auto-resume rides.
-- Export rides to `XLSX` and `FIT`.
+- Export rides to `XLSX`, `FIT`, and `GPX`.
 - Sync rides to Google Fit and Strava.
 - Pull biometric inputs from Google Fit for calorie estimation when enabled.
 - Search ride history by distance, speed, date, and text fields.

@@ -59,6 +59,7 @@
     <string name="preference_key_wheel_circumference">wheel_circumference</string>
     <string name="details_menu_title_export_csv">Export CSV</string>
     <string name="details_menu_title_export_xlsx">Export XLSX</string>
+    <string name="details_menu_title_export_gpx">Export GPX</string>
     <string name="notification_export_trip_in_progress_id">notification_export_trip_in_progress_id</string>
     <string name="notification_export_trip_in_progress_name">Export ride data in progress</string>
     <string name="notification_export_trip_id">notification_export_trip_complete_id</string>

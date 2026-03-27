@@ -49,8 +49,15 @@ class ExportTripWorker @AssistedInject constructor(
     @Assisted params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
     val logTag = "ExportTripWorker"
+    private val gpxMime = "application/gpx+xml"
     private val xlsxMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     private val binaryMime = "application/octet-stream"
+
+    private fun canPostNotifications(): Boolean =
+        ActivityCompat.checkSelfPermission(
+            appContext,
+            Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
 
     @Inject
     lateinit var tripsRepository: TripsRepository
@@ -89,6 +96,7 @@ class ExportTripWorker @AssistedInject constructor(
         Log.d(logTag, uri.toString())
 
         val mime = when (fileType) {
+            "gpx" -> gpxMime
             "xlsx" -> xlsxMime
             else -> binaryMime
         }
@@ -128,21 +136,11 @@ class ExportTripWorker @AssistedInject constructor(
         val inProgressId = getUriFilePart()?.toIntOrNull() ?: 0
         with(NotificationManagerCompat.from(appContext)) {
             Log.d(logTag, "notify in progress")
-            if (ActivityCompat.checkSelfPermission(
-                    appContext,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
-                return
+            if (!canPostNotifications()) {
+                Log.w(logTag, "POST_NOTIFICATIONS not granted; continuing export without notifications")
+            } else {
+                notify(inProgressId, inProgressBuilder.build())
             }
-            notify(inProgressId, inProgressBuilder.build())
         }
         appContext.mainExecutor().execute {
             Toast.makeText(
@@ -180,6 +178,12 @@ class ExportTripWorker @AssistedInject constructor(
 
             try {
                 when (fileType) {
+                    "gpx" -> exportRideToGpx(
+                        contentResolver,
+                        uri,
+                        exportData
+                    )
+
                     "xlsx" -> exportRideToXlsx(
                         contentResolver,
                         uri,
@@ -254,22 +258,12 @@ class ExportTripWorker @AssistedInject constructor(
                     )
                 with(NotificationManagerCompat.from(appContext)) {
                     Log.d(logTag, "notify export complete")
-                    cancel(inProgressId)
-                    if (ActivityCompat.checkSelfPermission(
-                            appContext,
-                            Manifest.permission.POST_NOTIFICATIONS
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        // TODO: Consider calling
-                        //    ActivityCompat#requestPermissions
-                        // here to request the missing permissions, and then overriding
-                        //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                        //                                          int[] grantResults)
-                        // to handle the case where the user grants the permission. See the documentation
-                        // for ActivityCompat#requestPermissions for more details.
-                        return
+                    if (canPostNotifications()) {
+                        cancel(inProgressId)
+                        notify(exportData.summary.id?.toInt() ?: 0, builder.build())
+                    } else {
+                        Log.w(logTag, "POST_NOTIFICATIONS not granted; export completed without notifications")
                     }
-                    notify(exportData.summary.id?.toInt() ?: 0, builder.build())
 
                     exportRepository.save(
                         Export(
@@ -298,8 +292,10 @@ class ExportTripWorker @AssistedInject constructor(
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 with(NotificationManagerCompat.from(appContext)) {
                     Log.d(logTag, "notify export complete")
-                    cancel(inProgressId)
-                    notify(exportData.summary.id?.toInt() ?: 0, builder.build())
+                    if (canPostNotifications()) {
+                        cancel(inProgressId)
+                        notify(exportData.summary.id?.toInt() ?: 0, builder.build())
+                    }
                 }
                 throw e
             }

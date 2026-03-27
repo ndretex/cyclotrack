@@ -1,10 +1,12 @@
 package com.kvl.cyclotrack
 
+import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
@@ -26,9 +28,11 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Space
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.MenuProvider
 import androidx.core.view.doOnPreDraw
@@ -111,6 +115,16 @@ class TripDetailsFragment : Fragment(), View.OnTouchListener {
     private lateinit var googleFitSyncStatus: GoogleFitSyncStatusEnum
     private lateinit var stravaSyncStatus: GoogleFitSyncStatusEnum
     private var pendingGoogleFitSyncConfirmation = false
+    private var pendingExportFileType: String? = null
+    private val requestNotificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) {
+        pendingExportFileType?.let { fileType ->
+            Log.d(logTag, "Notification permission result for export $fileType: $it")
+            pendingExportFileType = null
+            enqueueExport(fileType)
+        }
+    }
 
     private fun handleGoogleFitSyncStatus(status: GoogleFitSyncStatusEnum) {
         if (pendingGoogleFitSyncConfirmation) {
@@ -214,6 +228,70 @@ class TripDetailsFragment : Fragment(), View.OnTouchListener {
         savedInstanceState: Bundle?,
     ): View? {
         return inflater.inflate(R.layout.fragment_trip_details, container, false)
+    }
+
+    private fun enqueueExport(fileType: String) {
+        if (fileType == "xlsx" && requireActivity().checkSelfPermission(
+                "android.permission.WRITE_EXTERNAL_STORAGE"
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                requireActivity(),
+                arrayOf("android.permission.WRITE_EXTERNAL_STORAGE"),
+                0
+            )
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+        }
+        WorkManager.getInstance(requireContext())
+            .enqueue(
+                OneTimeWorkRequestBuilder<ExportTripWorker>()
+                    .setInputData(
+                        workDataOf(
+                            "tripId" to viewModel.tripId,
+                            "fileType" to fileType
+                        )
+                    )
+                    .build()
+            )
+    }
+
+    private fun ensureNotificationPermissionThenExport(fileType: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            enqueueExport(fileType)
+            return
+        }
+
+        if (ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            enqueueExport(fileType)
+            return
+        }
+
+        pendingExportFileType = fileType
+        if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+            AlertDialog.Builder(requireContext())
+                .setTitle("Allow notifications")
+                .setMessage("Enable notifications so Cyclotrack can alert you when the export is finished.")
+                .setPositiveButton("PROCEED") { _, _ ->
+                    requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
+                .setNegativeButton("CONTINUE WITHOUT") { _, _ ->
+                    pendingExportFileType = null
+                    enqueueExport(fileType)
+                }
+                .show()
+        } else {
+            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     private fun configureSyncOptions(menu: Menu) {
@@ -1073,49 +1151,17 @@ class TripDetailsFragment : Fragment(), View.OnTouchListener {
                     }
 
                     R.id.details_menu_action_export_xlsx -> {
-                        if (requireActivity().checkSelfPermission(
-                                "android.permission.WRITE_EXTERNAL_STORAGE"
-                            ) != PackageManager.PERMISSION_GRANTED
-                        ) {
-                            ActivityCompat.requestPermissions(
-                                requireActivity(),
-                                arrayOf("android.permission.WRITE_EXTERNAL_STORAGE"),
-                                0
-                            )
-                            // TODO: Consider calling
-                            //    ActivityCompat#requestPermissions
-                            // here to request the missing permissions, and then overriding
-                            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                            //                                          int[] grantResults)
-                            // to handle the case where the user grants the permission. See the documentation
-                            // for ActivityCompat#requestPermissions for more details.
-                        }
-                        WorkManager.getInstance(requireContext())
-                            .enqueue(
-                                OneTimeWorkRequestBuilder<ExportTripWorker>()
-                                    .setInputData(
-                                        workDataOf(
-                                            "tripId" to viewModel.tripId,
-                                            "fileType" to "xlsx"
-                                        )
-                                    )
-                                    .build()
-                            )
+                        ensureNotificationPermissionThenExport("xlsx")
                         true
                     }
 
                     R.id.details_menu_action_export_fit -> {
-                        WorkManager.getInstance(requireContext())
-                            .enqueue(
-                                OneTimeWorkRequestBuilder<ExportTripWorker>()
-                                    .setInputData(
-                                        workDataOf(
-                                            "tripId" to viewModel.tripId,
-                                            "fileType" to "fit"
-                                        )
-                                    )
-                                    .build()
-                            )
+                        ensureNotificationPermissionThenExport("fit")
+                        true
+                    }
+
+                    R.id.details_menu_action_export_gpx -> {
+                        ensureNotificationPermissionThenExport("gpx")
                         true
                     }
 
