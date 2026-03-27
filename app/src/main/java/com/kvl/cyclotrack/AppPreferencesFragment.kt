@@ -181,6 +181,7 @@ class AppPreferencesFragment : PreferenceFragmentCompat() {
         onPreferenceClickListener = Preference.OnPreferenceClickListener {
             AlertDialog.Builder(context).apply {
                 setPositiveButton("SYNC") { _, _ ->
+                    Log.i(logTag, "Google Fit connect requested from Settings")
                     configureGoogleFit(requireActivity())
                 }
                 setTitle(getString(R.string.preferences_sync_with_google_fit_title))
@@ -258,7 +259,16 @@ class AppPreferencesFragment : PreferenceFragmentCompat() {
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     fun onGoogleFitAccessGranted(@Suppress("UNUSED_PARAMETER") event: GoogleFitAccessGranted) {
-        userGoogleFitBiometricsDialog.show()
+        Log.i(logTag, "Google Fit access granted event received")
+        context?.let { ctx ->
+            AlertDialog.Builder(ctx)
+                .setTitle("Google Fit")
+                .setMessage("Sync with Google Fit is connected.")
+                .setPositiveButton("OK") { _, _ ->
+                    userGoogleFitBiometricsDialog.show()
+                }
+                .show()
+        } ?: userGoogleFitBiometricsDialog.show()
         configureGoogleFitPreference(requireContext())
     }
 

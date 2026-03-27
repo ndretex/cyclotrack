@@ -46,7 +46,7 @@ val fitnessOptions: FitnessOptions = FitnessOptions.builder().apply {
 
 fun getGoogleAccount(context: Context): GoogleSignInAccount? {
     try {
-        return GoogleSignIn.getAccountForExtension(context, fitnessOptions).takeIf { !it.isExpired }
+        return GoogleSignIn.getLastSignedInAccount(context).takeIf { it?.isExpired == false }
     } catch (e: Exception) {
         Log.e(logTag, "Error getting google account", e)
     }
@@ -399,8 +399,12 @@ fun accessGoogleFit(activity: Activity) {
     getLatestHeartRate(activity)
 }
 
-fun hasFitnessPermissions(context: Context): Boolean =
-    GoogleSignIn.hasPermissions(getGoogleAccount(context), fitnessOptions)
+fun hasFitnessPermissions(context: Context): Boolean {
+    val hasPermissions =
+        getGoogleAccount(context)?.let { GoogleSignIn.hasPermissions(it, fitnessOptions) } ?: false
+    Log.i(logTag, "Google Fit permissions granted: $hasPermissions")
+    return hasPermissions
+}
 
 fun configureGoogleFit(activity: Activity) {
     with(activity) {
@@ -409,7 +413,7 @@ fun configureGoogleFit(activity: Activity) {
             GoogleSignIn.requestPermissions(
                 this,
                 1,
-                getGoogleAccount(this),
+                GoogleSignIn.getLastSignedInAccount(this),
                 fitnessOptions
             )
         } else {

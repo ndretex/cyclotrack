@@ -282,8 +282,8 @@ class GoogleFitApiService @Inject constructor(@ApplicationContext private val co
     }
 
     private fun updateDataset(dataset: DataSet, startTime: Long, endTime: Long) {
-        Log.d(logTag, "Update ${dataset.dataPoints.size} data points in ${dataset.dataType.name}")
-        Log.d(
+        Log.i(logTag, "Update ${dataset.dataPoints.size} data points in ${dataset.dataType.name}")
+        Log.i(
             logTag,
             "with time interval ${startTime}-${endTime}"
         )
@@ -296,13 +296,13 @@ class GoogleFitApiService @Inject constructor(@ApplicationContext private val co
             getGoogleAccount(context)?.let { Fitness.getHistoryClient(context, it) }
                 ?.updateData(updateRequest)
                 ?.addOnSuccessListener {
-                    Log.d(
+                    Log.i(
                         logTag,
                         "Updated ${dataset.dataPoints.size} data points in ${dataset.dataType.name}"
                     )
                 }
                 ?.addOnFailureListener { e ->
-                    Log.d(logTag, "Failed to insert data points in ${dataset.dataType.name}: $e")
+                    Log.e(logTag, "Failed to update data points in ${dataset.dataType.name}", e)
                     //e.startResolutionForResult()
                 }
         }
@@ -310,11 +310,11 @@ class GoogleFitApiService @Inject constructor(@ApplicationContext private val co
 
     private fun insertDataset(dataset: DataSet) {
         if (dataset.dataPoints.isNotEmpty()) {
-            Log.d(
+            Log.i(
                 logTag,
                 "Insert ${dataset.dataPoints.size} data points in ${dataset.dataType.name}"
             )
-            Log.d(
+            Log.i(
                 logTag,
                 "with time interval ${
                     dataset.dataPoints.first().getTimestamp(TimeUnit.MILLISECONDS)
@@ -324,13 +324,13 @@ class GoogleFitApiService @Inject constructor(@ApplicationContext private val co
             getGoogleAccount(context)?.let { Fitness.getHistoryClient(context, it) }
                 ?.insertData(dataset)
                 ?.addOnSuccessListener {
-                    Log.d(
+                    Log.i(
                         logTag,
                         "Inserted ${dataset.dataPoints.size} data points in ${dataset.dataType.name}"
                     )
                 }
                 ?.addOnFailureListener { e ->
-                    Log.d(logTag, "Failed to insert data points in ${dataset.dataType.name}: $e")
+                    Log.e(logTag, "Failed to insert data points in ${dataset.dataType.name}", e)
                     //e.startResolutionForResult()
                 }
         } else {
@@ -439,8 +439,13 @@ class GoogleFitApiService @Inject constructor(@ApplicationContext private val co
         cadenceMeasurements: Array<CadenceSpeedMeasurement>,
         wheelCircumference: Float
     ) {
+        Log.i(
+            logTag,
+            "Insert datasets payload: measurements=${measurements.size}, heartRate=${heartRateMeasurements.size}, " +
+                "speed=${speedMeasurements.size}, cadence=${cadenceMeasurements.size}, wheelCircumference=$wheelCircumference"
+        )
         measurements.toList().chunked(1000).forEach {
-            Log.d(logTag, "Processing measurements chunk")
+            Log.i(logTag, "Processing measurements chunk of size ${it.size}")
             insertHeartRateDataset(heartRateMeasurements)
             insertLocationDataset(it.toTypedArray())
             insertDistanceDeltaDataset(it.toTypedArray())
@@ -458,8 +463,13 @@ class GoogleFitApiService @Inject constructor(@ApplicationContext private val co
         cadenceMeasurements: Array<CadenceSpeedMeasurement>,
         wheelCircumference: Float
     ) {
+        Log.i(
+            logTag,
+            "Update datasets payload: measurements=${measurements.size}, heartRate=${heartRateMeasurements.size}, " +
+                "speed=${speedMeasurements.size}, cadence=${cadenceMeasurements.size}, wheelCircumference=$wheelCircumference"
+        )
         measurements.toList().chunked(1000).forEach {
-            Log.d(logTag, "Processing measurements chunk")
+            Log.i(logTag, "Processing measurements chunk of size ${it.size}")
             updateHeartRateDataset(heartRateMeasurements)
             updateLocationDataset(it.toTypedArray())
             updateDistanceDeltaDataset(it.toTypedArray())
@@ -515,8 +525,10 @@ class GoogleFitApiService @Inject constructor(@ApplicationContext private val co
 
         getGoogleAccount(context)?.let { Fitness.getSessionsClient(context, it) }
             ?.insertSession(insertRequest.build())
-            ?.addOnSuccessListener { Log.d(logTag, "Ingested session for trip ${trip.id}") }
-            ?.addOnFailureListener { Log.d(logTag, "Failed to insert session for trip ${trip.id}") }
+            ?.addOnSuccessListener { Log.i(logTag, "Updated session for trip ${trip.id}") }
+            ?.addOnFailureListener { e ->
+                Log.e(logTag, "Failed to update session for trip ${trip.id}", e)
+            }
     }
 
     fun updateSession(
@@ -566,8 +578,10 @@ class GoogleFitApiService @Inject constructor(@ApplicationContext private val co
 
         getGoogleAccount(context)?.let { Fitness.getSessionsClient(context, it) }
             ?.insertSession(insertRequest.build())
-            ?.addOnSuccessListener { Log.d(logTag, "Ingested session for trip ${trip.id}") }
-            ?.addOnFailureListener { Log.d(logTag, "Failed to insert session for trip ${trip.id}") }
+            ?.addOnSuccessListener { Log.i(logTag, "Inserted session for trip ${trip.id}") }
+            ?.addOnFailureListener { e ->
+                Log.e(logTag, "Failed to insert session for trip ${trip.id}", e)
+            }
     }
 
     fun insertSession(
@@ -591,8 +605,10 @@ class GoogleFitApiService @Inject constructor(@ApplicationContext private val co
 
         getGoogleAccount(context)?.let { Fitness.getSessionsClient(context, it) }
             ?.insertSession(insertRequest.build())
-            ?.addOnSuccessListener { Log.d(logTag, "Ingested session for trip ${trip.id}") }
-            ?.addOnFailureListener { Log.d(logTag, "Failed to insert session for trip ${trip.id}") }
+            ?.addOnSuccessListener { Log.i(logTag, "Inserted session for trip ${trip.id}") }
+            ?.addOnFailureListener { e ->
+                Log.e(logTag, "Failed to insert session for trip ${trip.id}", e)
+            }
     }
 
     fun getSession(trip: Trip): Task<SessionReadResponse>? {
@@ -641,7 +657,7 @@ class GoogleFitApiService @Inject constructor(@ApplicationContext private val co
             .deleteAllSessions().build()
         getGoogleAccount(context)?.let { Fitness.getHistoryClient(context, it) }
             ?.deleteData(request)
-            ?.addOnSuccessListener { Log.d(logTag, "Removing trip ${tripId} from Google Fit") }
+            ?.addOnSuccessListener { Log.i(logTag, "Removed trip ${tripId} from Google Fit") }
             ?.addOnFailureListener {
                 Log.e(
                     logTag,
@@ -670,7 +686,7 @@ class GoogleFitApiService @Inject constructor(@ApplicationContext private val co
             .deleteAllSessions().build()
         getGoogleAccount(context)?.let { Fitness.getHistoryClient(context, it) }
             ?.deleteData(request)
-            ?.addOnSuccessListener { Log.d(logTag, "Removing all data from Google Fit") }
+            ?.addOnSuccessListener { Log.i(logTag, "Removed all data from Google Fit") }
             ?.addOnFailureListener {
                 Log.e(
                     logTag,

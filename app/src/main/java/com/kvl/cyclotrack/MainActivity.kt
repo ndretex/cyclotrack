@@ -11,6 +11,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.core.view.ViewCompat
@@ -19,6 +20,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.findNavController
+import androidx.navigation.ui.AppBarConfiguration
+import androidx.navigation.ui.setupActionBarWithNavController
 import androidx.navigation.ui.setupWithNavController
 import androidx.preference.PreferenceManager
 import androidx.work.BackoffPolicy
@@ -29,6 +32,7 @@ import com.google.android.gms.common.GoogleApiAvailability
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException
 import com.google.android.gms.common.GooglePlayServicesRepairableException
 import com.google.android.gms.security.ProviderInstaller
+import com.google.android.material.bottomappbar.BottomAppBar
 import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.firebase.analytics.FirebaseAnalytics
@@ -265,22 +269,64 @@ class MainActivity : AppCompatActivity() {
             }
             ViewCompat.requestApplyInsets(appBar)
         }
-        findViewById<com.google.android.material.bottomappbar.BottomAppBar>(R.id.main_activity_bottomAppBar)
-            .let { bottomAppBar ->
-                val initialBottomPadding = bottomAppBar.paddingBottom
-                ViewCompat.setOnApplyWindowInsetsListener(bottomAppBar) { view, insets ->
-                    val bottomInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
-                    view.updatePadding(bottom = initialBottomPadding + bottomInset)
-                    insets
-                }
-                ViewCompat.requestApplyInsets(bottomAppBar)
+        val bottomAppBar = findViewById<BottomAppBar>(R.id.main_activity_bottomAppBar)
+        val bottomNavigationView = findViewById<BottomNavigationView>(R.id.main_activity_bottom_menu)
+        val fab = findViewById<FloatingActionButton>(R.id.fab)
+        val navHostFragmentContainer = findViewById<View>(R.id.nav_host_fragment)
+        val initialBottomAppBarBottomPadding = bottomAppBar.paddingBottom
+        val initialBottomNavTopPadding = bottomNavigationView.paddingTop
+        val initialBottomNavBottomPadding = bottomNavigationView.paddingBottom
+        val initialFabBottomMargin = (fab.layoutParams as CoordinatorLayout.LayoutParams).bottomMargin
+        var hideTopBarForDestination = false
+        val initialNavHostTopPadding = navHostFragmentContainer.paddingTop
+        ViewCompat.setOnApplyWindowInsetsListener(navHostFragmentContainer) { view, insets ->
+            val topInset = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            view.updatePadding(
+                top = initialNavHostTopPadding + if (hideTopBarForDestination) topInset else 0
+            )
+            insets
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(bottomAppBar) { _, insets ->
+            val bottomInset = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+
+            bottomAppBar.updatePadding(bottom = initialBottomAppBarBottomPadding)
+            bottomNavigationView.updatePadding(
+                top = initialBottomNavTopPadding + (bottomInset / 2),
+                bottom = initialBottomNavBottomPadding + (bottomInset / 2)
+            )
+
+            (fab.layoutParams as? CoordinatorLayout.LayoutParams)?.let { params ->
+                params.bottomMargin = initialFabBottomMargin + bottomInset
+                fab.layoutParams = params
             }
+            insets
+        }
+        ViewCompat.requestApplyInsets(bottomAppBar)
         setSupportActionBar(findViewById(R.id.toolbar_main))
         googleFitApiService = GoogleFitApiService(this)
 
-        findViewById<BottomNavigationView>(R.id.main_activity_bottom_menu).setupWithNavController(
-            findNavController(R.id.nav_host_fragment)
+        val navController = findNavController(R.id.nav_host_fragment)
+        bottomNavigationView.setupWithNavController(navController)
+        setupActionBarWithNavController(
+            navController,
+            AppBarConfiguration(
+                setOf(
+                    R.id.AnalyticsFragment,
+                    R.id.TripSummariesFragment,
+                    R.id.BiometricsPreferenceFragment
+                )
+            )
         )
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            val appBar = findViewById<com.google.android.material.appbar.AppBarLayout>(R.id.app_bar_main)
+            hideTopBarForDestination = destination.id == R.id.AnalyticsFragment
+            appBar.visibility = if (hideTopBarForDestination) {
+                View.GONE
+            } else {
+                View.VISIBLE
+            }
+            ViewCompat.requestApplyInsets(navHostFragmentContainer)
+        }
 
         PreferenceManager.getDefaultSharedPreferences(this)
             .getBoolean(getString(R.string.preference_key_analytics_opt_in_presented), false).let {
@@ -304,7 +350,7 @@ class MainActivity : AppCompatActivity() {
             }.create()
         }
 
-        findViewById<FloatingActionButton>(R.id.fab).apply {
+        fab.apply {
             isEnabled = false
             visibility = View.INVISIBLE
             viewModel.latestTrip.observe(this@MainActivity) { trip: Trip? ->

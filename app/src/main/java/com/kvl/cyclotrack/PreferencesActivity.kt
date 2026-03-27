@@ -80,15 +80,33 @@ class PreferencesActivity : AppCompatActivity() {
                     else -> Log.d(this.javaClass.simpleName, "Result was not from Google Fit")
                 }
             }
-            Activity.RESULT_CANCELED -> Log.w(
-                this.javaClass.simpleName,
-                "Permission request was cancelled ${resultCode}"
-            )
+            Activity.RESULT_CANCELED -> {
+                Log.w(
+                    this.javaClass.simpleName,
+                    "Permission request was cancelled ${resultCode}"
+                )
+                if (requestCode == 1) {
+                    AlertDialog.Builder(this)
+                        .setTitle("Google Fit")
+                        .setMessage("Sync canceled. Please try again.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
 
-            else -> Log.w(
-                this.javaClass.simpleName,
-                "Google permission request failed ${resultCode}"
-            )
+            else -> {
+                Log.w(
+                    this.javaClass.simpleName,
+                    "Google permission request failed ${resultCode}"
+                )
+                if (requestCode == 1) {
+                    AlertDialog.Builder(this)
+                        .setTitle("Google Fit")
+                        .setMessage("Sync failed, try again.")
+                        .setPositiveButton("OK", null)
+                        .show()
+                }
+            }
         }
     }
 

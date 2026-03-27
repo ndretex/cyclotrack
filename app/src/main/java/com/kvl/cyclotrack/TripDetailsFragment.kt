@@ -58,7 +58,6 @@ import com.kvl.cyclotrack.data.HeartRateMeasurement
 import com.kvl.cyclotrack.util.configureGoogleFit
 import com.kvl.cyclotrack.util.getCaloriesBurnedLabel
 import com.kvl.cyclotrack.util.getDatasets
-import com.kvl.cyclotrack.util.getGoogleAccount
 import com.kvl.cyclotrack.util.getSpeedDataFromGps
 import com.kvl.cyclotrack.util.getSpeedDataFromSensor
 import com.kvl.cyclotrack.util.getTrendData
@@ -111,6 +110,40 @@ class TripDetailsFragment : Fragment(), View.OnTouchListener {
     private lateinit var maxCameraPosition: CameraPosition
     private lateinit var googleFitSyncStatus: GoogleFitSyncStatusEnum
     private lateinit var stravaSyncStatus: GoogleFitSyncStatusEnum
+    private var pendingGoogleFitSyncConfirmation = false
+
+    private fun handleGoogleFitSyncStatus(status: GoogleFitSyncStatusEnum) {
+        if (pendingGoogleFitSyncConfirmation) {
+            Log.i(logTag, "Observed Google Fit sync status for trip ${viewModel.tripId}: $status")
+            when (status) {
+                GoogleFitSyncStatusEnum.SYNCED -> {
+                    pendingGoogleFitSyncConfirmation = false
+                    activity?.let {
+                        AlertDialog.Builder(it)
+                            .setTitle("Google Fit")
+                            .setMessage("Ride synced successfully.")
+                            .setPositiveButton("OK", null)
+                            .show()
+                    }
+                }
+
+                GoogleFitSyncStatusEnum.FAILED -> {
+                    pendingGoogleFitSyncConfirmation = false
+                    activity?.let {
+                        AlertDialog.Builder(it)
+                            .setTitle("Google Fit")
+                            .setMessage("Sync failed, try again.")
+                            .setPositiveButton("OK", null)
+                            .show()
+                    }
+                }
+
+                else -> {
+                    // Keep waiting while work is still in progress.
+                }
+            }
+        }
+    }
 
 
     private fun drawPath(
@@ -992,6 +1025,7 @@ class TripDetailsFragment : Fragment(), View.OnTouchListener {
                 viewModel.tripOverview.observe(viewLifecycleOwner) {
                     googleFitSyncStatus = it.googleFitSyncStatus
                     stravaSyncStatus = it.stravaSyncStatus
+                    handleGoogleFitSyncStatus(googleFitSyncStatus)
                 }
             }
 
@@ -1086,6 +1120,8 @@ class TripDetailsFragment : Fragment(), View.OnTouchListener {
                     }
 
                     R.id.details_menu_action_sync -> {
+                        Log.i(logTag, "Manual Google Fit sync requested for trip ${viewModel.tripId}")
+                        pendingGoogleFitSyncConfirmation = true
                         WorkManager.getInstance(requireContext())
                             .enqueue(
                                 OneTimeWorkRequestBuilder<GoogleFitCreateSessionWorker>()
@@ -1115,12 +1151,6 @@ class TripDetailsFragment : Fragment(), View.OnTouchListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        if (getGoogleAccount(requireContext()) == null) {
-            Log.i(logTag, "Google token expired renewing token")
-            configureGoogleFit(requireActivity())
-        }
-
         if (this::mapView.isInitialized) mapView.onCreate(savedInstanceState)
     }
 

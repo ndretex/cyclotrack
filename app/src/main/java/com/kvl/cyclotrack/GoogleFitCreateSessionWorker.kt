@@ -50,6 +50,11 @@ class GoogleFitCreateSessionWorker @AssistedInject constructor(
                     val measurements = measurementsRepository.get(tripId)
                     val speedMeasurements =
                         cadenceSpeedMeasurementRepository.getSpeedMeasurements(tripId)
+                    Log.i(
+                        logTag,
+                        "Preparing Google Fit payload for trip $tripId: measurements=${measurements.size}, " +
+                            "timeStates=${timeStates.size}, speedMeasurements=${speedMeasurements.size}"
+                    )
 
                     googleFitApiService.insertDatasets(
                         measurements = measurements,
@@ -71,6 +76,9 @@ class GoogleFitCreateSessionWorker @AssistedInject constructor(
                         )
 
                     tripsRepository.setGoogleFitSyncStatus(tripId, GoogleFitSyncStatusEnum.SYNCED)
+                    Log.i(logTag, "Google Fit sync marked SYNCED for trip $tripId")
+                } else {
+                    Log.i(logTag, "Skipping Google Fit sync for trip $tripId: permissions not granted")
                 }
             } catch (e: Exception) {
                 Log.e(logTag, "Failed to insert trip $tripId", e)

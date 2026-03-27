@@ -33,11 +33,17 @@ class GoogleFitSyncTripsWorker @AssistedInject constructor(
     lateinit var googleFitApiService: GoogleFitApiService
 
     override suspend fun doWork(): Result {
-        Log.d(logTag, "Syncing sessions")
+        Log.i(logTag, "Google Fit trip sync worker started")
         if (hasFitnessPermissions(applicationContext)) {
-            tripsRepository.getGoogleFitUnsynced().forEach { trip ->
+            val unsyncedTrips = tripsRepository.getGoogleFitUnsynced()
+            val dirtyTrips = tripsRepository.getGoogleFitDirty()
+            Log.i(
+                logTag,
+                "Google Fit background sync starting: unsynced=${unsyncedTrips.size}, dirty=${dirtyTrips.size}"
+            )
+            unsyncedTrips.forEach { trip ->
                 try {
-                    Log.d(logTag, "Syncing trip; ID: ${trip.id} name: ${trip.name}")
+                    Log.i(logTag, "Queue create-session sync for trip id=${trip.id} name=${trip.name}")
                     WorkManager.getInstance(applicationContext)
                         .enqueue(
                             OneTimeWorkRequestBuilder<GoogleFitCreateSessionWorker>()
@@ -52,9 +58,9 @@ class GoogleFitSyncTripsWorker @AssistedInject constructor(
 
                 }
             }
-            tripsRepository.getGoogleFitDirty().forEach { trip ->
+            dirtyTrips.forEach { trip ->
                 try {
-                    Log.d(logTag, "Updating trip; ID: ${trip.id} name: ${trip.name}")
+                    Log.i(logTag, "Queue update-session sync for trip id=${trip.id} name=${trip.name}")
                     WorkManager.getInstance(applicationContext)
                         .enqueue(
                             OneTimeWorkRequestBuilder<GoogleFitUpdateSessionWorker>()
@@ -68,7 +74,10 @@ class GoogleFitSyncTripsWorker @AssistedInject constructor(
                     )
                 }
             }
+        } else {
+            Log.i(logTag, "Google Fit background sync skipped: permissions not granted")
         }
+        Log.i(logTag, "Google Fit trip sync worker finished")
         return Result.success()
     }
 }
