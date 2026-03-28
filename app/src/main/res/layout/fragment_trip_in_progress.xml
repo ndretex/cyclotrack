@@ -5,8 +5,114 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/backgroundColor"
     android:keepScreenOn="true"
     tools:context=".TripInProgressFragment">
+
+    <LinearLayout
+        android:id="@+id/dashboard_guidance_container"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="36dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/debug_nav_border_container"
+        android:gravity="top"
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="4dp"
+        android:visibility="gone"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="124dp"
+            android:layout_height="220dp"
+            android:background="@drawable/debug_nav_border_left_column"
+            android:gravity="top|center_horizontal"
+            android:orientation="vertical">
+
+            <com.kvl.cyclotrack.ManeuverIconView
+                android:id="@+id/dashboard_guidance_maneuver_icon"
+                android:layout_width="112dp"
+                android:layout_height="112dp"
+                android:background="@drawable/debug_nav_border_maneuver"
+                android:contentDescription="@string/dashboard_guidance_maneuver_icon_description" />
+
+            <TextView
+                android:id="@+id/dashboard_guidance_distance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/debug_nav_border_distance"
+                android:fontFamily="@font/orbitron_medium"
+                android:gravity="center_horizontal"
+                android:textColor="#FFFFFF"
+                android:textSize="26sp"
+                tools:text="120 m" />
+
+            <TextView
+                android:id="@+id/dashboard_guidance_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/debug_nav_border_title"
+                android:fontFamily="@font/orbitron_medium"
+                android:gravity="center_horizontal"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp"
+                android:visibility="gone"
+                tools:text="Off route"
+                tools:visibility="visible" />
+        </LinearLayout>
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="220dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/debug_nav_border_preview"
+            android:layout_weight="1">
+
+            <com.kvl.cyclotrack.SchematicGuidanceView
+                android:id="@+id/dashboard_guidance_preview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/dashboard_guidance_preview_description" />
+
+            <LinearLayout
+                android:id="@+id/dashboard_guidance_compass_row"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_marginTop="6dp"
+                android:layout_marginEnd="6dp"
+                android:background="@drawable/debug_nav_border_compass"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/dashboard_guidance_compass_icon"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:contentDescription="@string/dashboard_guidance_north_indicator_description"
+                    android:src="@drawable/ic_long_arrow_up"
+                    app:tint="#BDBDBD" />
+
+                <TextView
+                    android:id="@+id/dashboard_guidance_compass_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
+                    android:fontFamily="@font/orbitron_medium"
+                    android:text="@string/dashboard_guidance_north_label"
+                    android:textColor="#BDBDBD"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </FrameLayout>
+    </LinearLayout>
 
     <com.kvl.cyclotrack.MeasurementView
         android:id="@+id/measurement_top"
@@ -16,7 +122,7 @@
         app:layout_constraintBottom_toTopOf="@id/measurement_topLeft"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/dashboard_guidance_container"
         measurement_view:autoShrinkText="false"
         measurement_view:textSize="60sp" />
 

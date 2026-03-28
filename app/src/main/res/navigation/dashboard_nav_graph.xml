@@ -23,6 +23,18 @@
             android:name="tripId"
             android:defaultValue="-1L"
             app:argType="long" />
+        <argument
+            android:name="dashboardMode"
+            android:defaultValue="recording"
+            app:argType="string" />
+        <argument
+            android:name="navigationSourceType"
+            android:defaultValue="none"
+            app:argType="string" />
+        <argument
+            android:name="navigationSourceId"
+            android:defaultValue="-1L"
+            app:argType="long" />
         <action
             android:id="@+id/action_finish_trip"
             app:destination="@id/TripDetailsActivity">

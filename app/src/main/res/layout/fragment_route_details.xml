@@ -72,6 +72,13 @@
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 tools:text="Source: Komoot" />
 
+            <Button
+                android:id="@+id/route_details_start_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/route_detail_start_button" />
+
             <com.kvl.cyclotrack.widgets.HeadingView
                 android:id="@+id/route_details_distance_heading"
                 android:layout_width="match_parent"

@@ -29,6 +29,7 @@ cyclotrack-keystore
 /captures
 .externalNativeBuild
 .cxx
+*.gpx
 
 # dependencies
 /node_modules

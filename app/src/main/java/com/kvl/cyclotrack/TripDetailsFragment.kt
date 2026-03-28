@@ -66,6 +66,7 @@ import com.kvl.cyclotrack.util.getSpeedDataFromGps
 import com.kvl.cyclotrack.util.getSpeedDataFromSensor
 import com.kvl.cyclotrack.util.getTrendData
 import com.kvl.cyclotrack.util.hasFitnessPermissions
+import com.kvl.cyclotrack.util.putActiveNavigationSession
 import com.kvl.cyclotrack.util.useBleSpeedData
 import com.kvl.cyclotrack.widgets.AxisLabelOrientation
 import com.kvl.cyclotrack.widgets.AxisLabels
@@ -1117,6 +1118,22 @@ class TripDetailsFragment : Fragment(), View.OnTouchListener {
             override fun onMenuItemSelected(item: MenuItem): Boolean {
                 Log.d(logTag, "Options menu clicked")
                 return when (item.itemId) {
+                    R.id.details_menu_action_rerun_ride -> {
+                        val navigationConfig = DashboardNavigationConfig(
+                            mode = DashboardMode.NAVIGATION,
+                            sourceType = NavigationSourceType.TRIP,
+                            sourceId = args.tripId
+                        )
+                        putActiveNavigationSession(requireContext(), navigationConfig)
+                        startActivity(
+                            createDashboardIntent(
+                                requireContext(),
+                                navigationConfig = navigationConfig
+                            )
+                        )
+                        true
+                    }
+
                     R.id.details_menu_action_edit -> {
                         try {
                             findNavController()

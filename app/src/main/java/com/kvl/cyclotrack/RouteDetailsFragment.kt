@@ -7,6 +7,7 @@ import android.text.format.DateUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -21,6 +22,7 @@ import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.model.MapStyleOptions
+import com.kvl.cyclotrack.util.putActiveNavigationSession
 import com.kvl.cyclotrack.util.SystemUtils
 import com.kvl.cyclotrack.widgets.AxisLabels
 import com.kvl.cyclotrack.widgets.BordersEnum
@@ -90,6 +92,20 @@ class RouteDetailsFragment : Fragment() {
         gradeChartView = view.findViewById(R.id.route_details_grade_chart)
         view.findViewById<ImageButton>(R.id.route_details_edit_button).setOnClickListener {
             showRenameDialog()
+        }
+        view.findViewById<Button>(R.id.route_details_start_button).setOnClickListener {
+            val navigationConfig = DashboardNavigationConfig(
+                mode = DashboardMode.NAVIGATION,
+                sourceType = NavigationSourceType.ROUTE,
+                sourceId = args.routeId
+            )
+            putActiveNavigationSession(requireContext(), navigationConfig)
+            startActivity(
+                createDashboardIntent(
+                    requireContext(),
+                    navigationConfig = navigationConfig
+                )
+            )
         }
 
         mapView.onCreate(savedInstanceState)

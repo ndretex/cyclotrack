@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.IntentSender
 import android.content.SharedPreferences
+import android.graphics.Color
 import android.graphics.Rect
 import android.location.Location
 import android.os.Bundle
@@ -48,8 +49,15 @@ import com.google.firebase.analytics.logEvent
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import com.kvl.cyclotrack.events.StartTripEvent
 import com.kvl.cyclotrack.events.WheelCircumferenceEvent
+import com.kvl.cyclotrack.util.clearActiveNavigationSession
 import com.kvl.cyclotrack.util.getBrightnessPreference
+import com.kvl.cyclotrack.util.getActiveNavigationSession
+import com.kvl.cyclotrack.util.getSystemOfMeasurement
 import com.kvl.cyclotrack.util.getSafeZoneMargins
+import com.kvl.cyclotrack.util.FEET_TO_MILES
+import com.kvl.cyclotrack.util.METERS_TO_FEET
+import com.kvl.cyclotrack.util.putActiveNavigationSession
+import com.kvl.cyclotrack.util.updateActiveNavigationRecordingTripId
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import org.greenrobot.eventbus.EventBus
@@ -67,6 +75,24 @@ import kotlin.math.roundToInt
 class TripInProgressFragment :
     Fragment(), OnTouchListener {
     val logTag = "TripInProgressFragment"
+
+    companion object {
+        private const val GUIDANCE_BURN_IN_DRIFT_INTERVAL_MS = 60_000L
+        private const val GUIDANCE_BURN_IN_DRIFT_ANIMATION_MS = 600L
+        private val GUIDANCE_BURN_IN_OFFSETS = listOf(
+            Pair(0f, 0f),
+            Pair(3f, 0f),
+            Pair(3f, 2f),
+            Pair(0f, 3f),
+            Pair(-3f, 2f),
+            Pair(-3f, 0f),
+            Pair(-2f, -3f),
+            Pair(0f, -3f),
+            Pair(2f, -2f)
+        )
+
+        fun newInstance() = TripInProgressFragment()
+    }
 
     private val viewModel: TripInProgressViewModel by viewModels()
     private val args: TripInProgressFragmentArgs by navArgs()
@@ -90,9 +116,18 @@ class TripInProgressFragment :
     private lateinit var windDirectionArrow: ImageView
     private lateinit var compassImage: ImageView
     private lateinit var windIcon: ImageView
+    private lateinit var guidanceContainer: View
+    private lateinit var guidanceManeuverIcon: ManeuverIconView
+    private lateinit var guidanceDistanceTextView: TextView
+    private lateinit var guidanceTitleTextView: TextView
+    private lateinit var guidanceCompassRow: View
+    private lateinit var guidanceCompassIcon: ImageView
+    private lateinit var guidanceCompassTextView: TextView
+    private lateinit var guidancePreviewView: SchematicGuidanceView
 
     private var gpsEnabled = true
     private var isTimeTickRegistered = false
+    private var navigationConfig = DashboardNavigationConfig()
     private val lowBatteryThreshold = 15
     private lateinit var sharedPreferences: SharedPreferences
     private val userCircumference: Float?
@@ -127,10 +162,6 @@ class TripInProgressFragment :
             Log.v(logTag, "Received time tick")
             updateClock()
         }
-    }
-
-    companion object {
-        fun newInstance() = TripInProgressFragment()
     }
 
     override fun onCreateView(
@@ -270,6 +301,9 @@ class TripInProgressFragment :
             .logEvent("StopTrip") {
                 param("TripDuration", viewModel.currentProgress.value?.duration ?: 0.0)
             }
+        if (navigationConfig.isNavigation) {
+            clearActiveNavigationSession(requireContext())
+        }
         requireActivity().startService(Intent(
             requireContext(),
             TripInProgressService::class.java
@@ -344,6 +378,9 @@ class TripInProgressFragment :
     @Subscribe(threadMode = ThreadMode.MAIN)
     fun onStartTripEvent(event: StartTripEvent) {
         event.tripId.takeIf { it >= 0 }?.let { tripId ->
+            if (navigationConfig.isNavigation) {
+                updateActiveNavigationRecordingTripId(requireContext(), tripId)
+            }
             initializeAfterTripCreated(tripId)
             viewModel.startTrip(tripId, viewLifecycleOwner)
             FirebaseAnalytics.getInstance(requireContext())
@@ -366,6 +403,114 @@ class TripInProgressFragment :
                     )
                 }
         }
+    }
+
+    private fun resolveNavigationConfig(currentTripId: Long?): DashboardNavigationConfig {
+        val explicitConfig = DashboardNavigationConfig(
+            mode = DashboardMode.fromWireValue(args.dashboardMode),
+            sourceType = NavigationSourceType.fromWireValue(args.navigationSourceType),
+            sourceId = args.navigationSourceId
+        )
+        if (explicitConfig.isNavigation) {
+            putActiveNavigationSession(requireContext(), explicitConfig)
+            return explicitConfig
+        }
+
+        return getActiveNavigationSession(requireContext())
+            ?.takeIf { currentTripId != null && it.recordingTripId == currentTripId }
+            ?.let {
+                DashboardNavigationConfig(
+                    mode = DashboardMode.NAVIGATION,
+                    sourceType = it.sourceType,
+                    sourceId = it.sourceId
+                )
+            }
+            ?: DashboardNavigationConfig()
+    }
+
+    private fun applyNavigationConfig(currentTripId: Long?) {
+        navigationConfig = resolveNavigationConfig(currentTripId)
+        guidanceContainer.visibility = if (navigationConfig.isNavigation) VISIBLE else GONE
+        viewModel.configureNavigation(navigationConfig)
+        applyGuidanceSnapshot(viewModel.guidanceSnapshot.value)
+        updateGuidanceBurnInDrift()
+    }
+
+    private fun formatGuidanceDistance(distanceMeters: Double?): String {
+        if (distanceMeters == null) return "--"
+        return when (getSystemOfMeasurement(requireContext())) {
+            "2" -> when {
+                distanceMeters >= 1000.0 -> String.format(
+                    Locale.getDefault(),
+                    "%.1f km",
+                    distanceMeters / 1000.0
+                )
+
+                else -> String.format(Locale.getDefault(), "%.0f m", distanceMeters)
+            }
+
+            else -> {
+                val feet = distanceMeters * METERS_TO_FEET
+                when {
+                    feet >= 1000.0 -> String.format(
+                        Locale.getDefault(),
+                        "%.1f mi",
+                        distanceMeters * METERS_TO_FEET * FEET_TO_MILES
+                    )
+
+                    else -> String.format(Locale.getDefault(), "%.0f ft", feet)
+                }
+            }
+        }
+    }
+
+    private fun applyGuidanceSnapshot(snapshot: GuidanceSnapshot?) {
+        if (!navigationConfig.isNavigation) {
+            guidanceContainer.visibility = GONE
+            updateGuidanceBurnInDrift()
+            return
+        }
+        if (snapshot == null) {
+            guidanceContainer.visibility = INVISIBLE
+            updateGuidanceBurnInDrift()
+            return
+        }
+
+        guidanceContainer.visibility = VISIBLE
+        val guidanceTitle = when (snapshot.state) {
+            GuidanceUiState.OFF_ROUTE -> getString(R.string.dashboard_guidance_off_route)
+            GuidanceUiState.GPS_WEAK -> getString(R.string.dashboard_guidance_gps_weak)
+            GuidanceUiState.ARRIVAL -> getString(R.string.dashboard_guidance_arrival)
+            else -> ""
+        }
+        guidanceTitleTextView.text = guidanceTitle
+        guidanceTitleTextView.visibility = if (guidanceTitle.isEmpty()) GONE else VISIBLE
+        val guidanceAccentColor = when (snapshot.state) {
+            GuidanceUiState.OFF_ROUTE -> Color.parseColor("#FF7043")
+            GuidanceUiState.GPS_WEAK -> Color.parseColor("#BDBDBD")
+            else -> Color.WHITE
+        }
+        guidanceTitleTextView.setTextColor(guidanceAccentColor)
+        guidanceDistanceTextView.text = when (snapshot.state) {
+            GuidanceUiState.OFF_ROUTE, GuidanceUiState.GPS_WEAK -> "--"
+            GuidanceUiState.ARRIVAL -> formatGuidanceDistance(snapshot.remainingDistanceMeters)
+            else -> formatGuidanceDistance(
+                snapshot.nextCueDistanceMeters ?: snapshot.remainingDistanceMeters
+            )
+        }
+        guidanceDistanceTextView.setTextColor(guidanceAccentColor)
+        guidanceManeuverIcon.setGuidance(snapshot.state, snapshot.maneuver)
+
+        val showPreview = snapshot.previewPoints.size > 1
+        guidancePreviewView.visibility = if (showPreview) VISIBLE else INVISIBLE
+        if (showPreview) {
+            guidancePreviewView.setPreview(
+                snapshot.previewPoints,
+                snapshot.previewCurrentIndex,
+                snapshot.previewCueIndex
+            )
+        }
+        updateGuidanceBurnInDrift()
     }
 
 
@@ -449,6 +594,7 @@ class TripInProgressFragment :
         initializeMeasurementUpdateObservers()
         initializeWeatherObservers()
         initializeBurnInReduction()
+        viewModel.guidanceSnapshot.observe(viewLifecycleOwner, ::applyGuidanceSnapshot)
     }
 
     private fun initializeClockTick() {
@@ -495,6 +641,12 @@ class TripInProgressFragment :
 
     private fun initializeMeasurementUpdateObservers() {
         viewModel.location.observe(viewLifecycleOwner) { location ->
+            if (navigationConfig.isNavigation) {
+                viewModel.updateNavigation(location)
+                guidanceCompassRow.visibility = if (location.hasBearing()) VISIBLE else INVISIBLE
+                guidanceCompassTextView.text = getString(R.string.dashboard_guidance_north_label)
+                guidanceCompassIcon.rotation = -location.bearing
+            }
             if (viewModel.speedSensor.value?.rpm == null || circumference == null)
                 topRightView.value =
                     getGpsSpeed(location, topRightView.value.toString().toDoubleOrNull())
@@ -702,6 +854,7 @@ class TripInProgressFragment :
             middleRightView.enableBurnInReduction(birEnabled)
             bottomLeftView.enableBurnInReduction(birEnabled)
             bottomRightView.enableBurnInReduction(birEnabled)
+            updateGuidanceBurnInDrift()
         }
     }
 
@@ -726,6 +879,14 @@ class TripInProgressFragment :
         windDirectionArrow = view.findViewById(R.id.image_arrow_wind_direction)
         compassImage = view.findViewById(R.id.compass_image)
         windIcon = view.findViewById(R.id.image_wind_icon)
+        guidanceContainer = view.findViewById(R.id.dashboard_guidance_container)
+        guidanceManeuverIcon = view.findViewById(R.id.dashboard_guidance_maneuver_icon)
+        guidanceDistanceTextView = view.findViewById(R.id.dashboard_guidance_distance)
+        guidanceTitleTextView = view.findViewById(R.id.dashboard_guidance_title)
+        guidanceCompassRow = view.findViewById(R.id.dashboard_guidance_compass_row)
+        guidanceCompassIcon = view.findViewById(R.id.dashboard_guidance_compass_icon)
+        guidanceCompassTextView = view.findViewById(R.id.dashboard_guidance_compass_text)
+        guidancePreviewView = view.findViewById(R.id.dashboard_guidance_preview)
 
         //TODO: Cleanup below
         //This is a lot of implementation specific initialization
@@ -816,6 +977,8 @@ class TripInProgressFragment :
                 viewModel.tripId = tripId
             }
 
+            applyNavigationConfig(viewModel.tripId)
+
             when (val tripId = viewModel.tripId) {
                 null -> {
                     requireActivity().startService(Intent(
@@ -898,6 +1061,12 @@ class TripInProgressFragment :
     override fun onDestroyView() {
         super.onDestroyView()
         Log.d(logTag, "onDestroyView")
+        guidanceBurnInHandler.removeCallbacks(guidanceBurnInCallback)
+        if (::guidanceContainer.isInitialized) {
+            guidanceContainer.animate().cancel()
+            guidanceContainer.translationX = 0f
+            guidanceContainer.translationY = 0f
+        }
         if (isTimeTickRegistered) context?.unregisterReceiver(timeTickReceiver)
 
         if (viewModel.tripId == null)
@@ -907,6 +1076,12 @@ class TripInProgressFragment :
             ).apply {
                 this.action = getString(R.string.action_shutdown_trip_service)
             })
+        if (!requireActivity().isChangingConfigurations &&
+            viewModel.tripId == null &&
+            navigationConfig.isNavigation
+        ) {
+            clearActiveNavigationSession(requireContext())
+        }
         FirebaseAnalytics.getInstance(requireContext()).logEvent("LeaveDashboard") {}
     }
 
@@ -965,9 +1140,60 @@ class TripInProgressFragment :
     private val burnInReductionCallback = Runnable {
         viewModel.burnInReductionActive.value = viewModel.burnInReductionEnabled()
     }
+    private val guidanceBurnInHandler = android.os.Handler(Looper.getMainLooper())
+    private var guidanceBurnInOffsetIndex = 0
+    private val guidanceBurnInCallback: Runnable = Runnable {
+        if (!shouldApplyGuidanceBurnInDrift()) {
+            resetGuidanceBurnInDrift()
+            return@Runnable
+        }
+        guidanceBurnInOffsetIndex =
+            (guidanceBurnInOffsetIndex + 1) % GUIDANCE_BURN_IN_OFFSETS.size
+        val (offsetX, offsetY) = GUIDANCE_BURN_IN_OFFSETS[guidanceBurnInOffsetIndex]
+        guidanceContainer.animate()
+            .setDuration(GUIDANCE_BURN_IN_DRIFT_ANIMATION_MS)
+            .translationX(offsetX)
+            .translationY(offsetY)
+            .start()
+        guidanceBurnInHandler.postDelayed(
+            guidanceBurnInCallback,
+            GUIDANCE_BURN_IN_DRIFT_INTERVAL_MS
+        )
+    }
     private val hidePauseHandler = android.os.Handler(Looper.getMainLooper())
     private val hidePauseCallback = Runnable {
         slidePauseDown()
+    }
+
+    private fun shouldApplyGuidanceBurnInDrift(): Boolean =
+        ::guidanceContainer.isInitialized &&
+                navigationConfig.isNavigation &&
+                viewModel.burnInReductionActive.value == true &&
+                guidanceContainer.visibility == VISIBLE
+
+    private fun resetGuidanceBurnInDrift() {
+        guidanceBurnInOffsetIndex = 0
+        if (::guidanceContainer.isInitialized) {
+            guidanceContainer.animate().cancel()
+            guidanceContainer.translationX = 0f
+            guidanceContainer.translationY = 0f
+        }
+    }
+
+    private fun updateGuidanceBurnInDrift() {
+        guidanceBurnInHandler.removeCallbacks(guidanceBurnInCallback)
+        if (!shouldApplyGuidanceBurnInDrift()) {
+            resetGuidanceBurnInDrift()
+            return
+        }
+
+        val (offsetX, offsetY) = GUIDANCE_BURN_IN_OFFSETS[guidanceBurnInOffsetIndex]
+        guidanceContainer.translationX = offsetX
+        guidanceContainer.translationY = offsetY
+        guidanceBurnInHandler.postDelayed(
+            guidanceBurnInCallback,
+            GUIDANCE_BURN_IN_DRIFT_INTERVAL_MS
+        )
     }
 
     private fun isPauseButtonHidden() = pauseButton.translationY > pauseButton.height / 2f

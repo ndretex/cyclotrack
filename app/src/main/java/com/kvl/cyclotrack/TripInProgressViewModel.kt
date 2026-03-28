@@ -25,10 +25,14 @@ import kotlin.concurrent.timerTask
 @HiltViewModel
 class TripInProgressViewModel @Inject constructor(
     private val bikeRepository: BikeRepository,
+    private val tripsRepository: TripsRepository,
+    private val measurementsRepository: MeasurementsRepository,
+    private val routeRepository: RouteRepository,
+    private val routePointRepository: RoutePointRepository,
     private val timeStateRepository: TimeStateRepository,
     private val splitRepository: SplitRepository,
     private val gpsService: GpsService,
-    weatherRepository: WeatherRepository
+    weatherRepository: WeatherRepository,
 ) : ViewModel() {
     private val logTag = "TripInProgressViewModel"
 
@@ -60,10 +64,14 @@ class TripInProgressViewModel @Inject constructor(
     private val clockTick = Timer()
     private val _currentProgress = MutableLiveData<TripProgress>()
     private val _currentTime = MutableLiveData<Double>()
+    private val _guidanceSnapshot = MutableLiveData<GuidanceSnapshot?>()
     private val currentTimeStateObserver: Observer<TimeState> = Observer { timeState ->
         Log.d(logTag, "onChanged current time state observer: ${timeState.state}")
         currentState = timeState.state
     }
+    private var navigationConfig = DashboardNavigationConfig()
+    private var navigationPath: NavigablePath? = null
+    private var lastMatchedIndex = -1
 
     val burnInReductionActive = MutableLiveData(burnInReductionUserPref)
 
@@ -119,7 +127,59 @@ class TripInProgressViewModel @Inject constructor(
     val lastCompleteSplit: LiveData<Split>
         get() = _lastCompleteSplitLive
 
+    val guidanceSnapshot: LiveData<GuidanceSnapshot?>
+        get() = _guidanceSnapshot
+
     var tripId: Long? = null
+
+    fun configureNavigation(config: DashboardNavigationConfig) {
+        if (navigationConfig == config && (config.isNavigation == false || navigationPath != null)) {
+            return
+        }
+
+        navigationConfig = config
+        if (!config.isNavigation) {
+            navigationPath = null
+            lastMatchedIndex = -1
+            _guidanceSnapshot.value = null
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            navigationPath = runCatching {
+                when (config.sourceType) {
+                    NavigationSourceType.ROUTE -> {
+                        val route = routeRepository.get(config.sourceId)
+                        val routePoints = routePointRepository.get(config.sourceId)
+                        route?.let {
+                            buildNavigablePath(it.name, routePoints)
+                        }
+                    }
+
+                    NavigationSourceType.TRIP -> {
+                        val trip = tripsRepository.get(config.sourceId)
+                        val measurements = measurementsRepository.get(config.sourceId)
+                        buildNavigablePath(
+                            trip.name ?: getDefaultTripName(),
+                            measurements
+                        )
+                    }
+
+                    else -> null
+                }
+            }.getOrNull()
+
+            lastMatchedIndex = -1
+            _guidanceSnapshot.postValue(navigationPath?.let(::initialGuidanceSnapshot))
+        }
+    }
+
+    fun updateNavigation(location: Location) {
+        val path = navigationPath ?: return
+        val snapshot = computeGuidanceSnapshot(path, location, lastMatchedIndex)
+        lastMatchedIndex = snapshot.matchedPointIndex
+        _guidanceSnapshot.value = snapshot
+    }
 
     private fun accumulateDuration(timeStates: Array<TimeState>?) {
         timeStates?.let { ts ->

@@ -217,4 +217,14 @@
     <string name="route_import_error_no_points">The selected file does not contain any route points.</string>
     <string name="route_import_error_no_fit_geometry">This FIT file does not contain route geometry.</string>
     <string name="route_import_source_fit_course">FIT course</string>
+    <string name="route_detail_start_button">Start route</string>
+    <string name="details_menu_title_rerun_ride">Re-run ride</string>
+    <string name="dashboard_guidance_off_route">Off route</string>
+    <string name="dashboard_guidance_gps_weak">GPS weak</string>
+    <string name="dashboard_guidance_arrival">Destination</string>
+    <string name="dashboard_guidance_remaining_label">Remaining</string>
+    <string name="dashboard_guidance_preview_description">Navigation guidance preview</string>
+    <string name="dashboard_guidance_maneuver_icon_description">Next maneuver</string>
+    <string name="dashboard_guidance_north_label">N</string>
+    <string name="dashboard_guidance_north_indicator_description">North indicator</string>
 </resources>
