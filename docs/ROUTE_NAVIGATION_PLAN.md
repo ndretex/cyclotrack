@@ -1,8 +1,23 @@
 # Route Replay And Guidance Architecture Plan
 
-Status: Draft for review before implementation
+Status: Historical planning document, partially superseded by implementation
 
-This document plans the next feature after route import: navigation mode for re-running a past ride or following a saved route.
+This document originally planned navigation mode for re-running a past ride or following a saved route.
+The feature is now implemented in the app. The sections below are retained as design context, but the
+current shipped behavior is documented in `ROUTE_NAVIGATION_IMPLEMENTATION.md`.
+
+## Current Reality Check
+
+The app now already supports:
+
+- launching navigation from route details and trip details
+- using the existing dashboard for both recording and navigation
+- local guidance with maneuver generation and off-route detection
+- Valhalla-backed path upgrade and reroute support
+- in-dashboard route preview
+- loop-route safeguards to avoid snapping or rerouting straight to the finish when start and finish are close together
+
+The remaining value of this document is architectural history and design rationale, not an up-to-date feature checklist.
 
 Cyclotrack already has:
 

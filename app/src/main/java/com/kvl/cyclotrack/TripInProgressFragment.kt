@@ -59,7 +59,16 @@ import com.kvl.cyclotrack.util.METERS_TO_FEET
 import com.kvl.cyclotrack.util.putActiveNavigationSession
 import com.kvl.cyclotrack.util.updateActiveNavigationRecordingTripId
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.maplibre.android.annotations.PolylineOptions
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.Style
 import org.greenrobot.eventbus.EventBus
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
@@ -79,6 +88,7 @@ class TripInProgressFragment :
     companion object {
         private const val GUIDANCE_BURN_IN_DRIFT_INTERVAL_MS = 60_000L
         private const val GUIDANCE_BURN_IN_DRIFT_ANIMATION_MS = 600L
+        private const val GUIDANCE_MAP_STATE_KEY = "guidance_map_state"
         private val GUIDANCE_BURN_IN_OFFSETS = listOf(
             Pair(0f, 0f),
             Pair(3f, 0f),
@@ -123,11 +133,15 @@ class TripInProgressFragment :
     private lateinit var guidanceCompassRow: View
     private lateinit var guidanceCompassIcon: ImageView
     private lateinit var guidanceCompassTextView: TextView
-    private lateinit var guidancePreviewView: SchematicGuidanceView
+    private lateinit var guidanceRiderOverlay: ImageView
+    private var guidanceMapView: MapView? = null
+    private var guidanceMap: MapLibreMap? = null
+    private var guidanceMapStyleReady = false
 
     private var gpsEnabled = true
     private var isTimeTickRegistered = false
     private var navigationConfig = DashboardNavigationConfig()
+    private var latestGuidanceSnapshot: GuidanceSnapshot? = null
     private val lowBatteryThreshold = 15
     private lateinit var sharedPreferences: SharedPreferences
     private val userCircumference: Float?
@@ -296,6 +310,43 @@ class TripInProgressFragment :
         })
     }
 
+    private fun showEndTripConfirmation(tripId: Long) {
+        if (tripId < 0) {
+            endTrip(tripId)
+            return
+        }
+
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.end_trip_confirmation_title)
+            .setMessage(R.string.end_trip_confirmation_message)
+            .setPositiveButton(R.string.save_trip_action) { _, _ -> endTrip(tripId) }
+            .setNegativeButton(R.string.discard_trip_action) { _, _ -> discardTrip(tripId) }
+            .show()
+    }
+
+    private fun discardTrip(tripId: Long) {
+        if (navigationConfig.isNavigation) {
+            clearActiveNavigationSession(requireContext())
+        }
+        requireActivity().startService(Intent(
+            requireContext(),
+            TripInProgressService::class.java
+        ).apply {
+            this.action = getString(R.string.action_stop_trip_service)
+            this.putExtra("tripId", tripId)
+        })
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            repeat(20) {
+                if (viewModel.removeTripWhenFinished(tripId)) return@launch
+                delay(150)
+            }
+            viewModel.forceRemoveTrip(tripId)
+        }
+
+        findNavController().navigate(R.id.action_back_to_summaries)
+    }
+
     private fun endTrip(tripId: Long) {
         FirebaseAnalytics.getInstance(requireContext())
             .logEvent("StopTrip") {
@@ -430,6 +481,10 @@ class TripInProgressFragment :
 
     private fun applyNavigationConfig(currentTripId: Long?) {
         navigationConfig = resolveNavigationConfig(currentTripId)
+        Log.i(
+            logTag,
+            "Applying navigation config: mode=${navigationConfig.mode}, sourceType=${navigationConfig.sourceType}, sourceId=${navigationConfig.sourceId}, isNavigation=${navigationConfig.isNavigation}, currentTripId=$currentTripId"
+        )
         guidanceContainer.visibility = if (navigationConfig.isNavigation) VISIBLE else GONE
         viewModel.configureNavigation(navigationConfig)
         applyGuidanceSnapshot(viewModel.guidanceSnapshot.value)
@@ -464,24 +519,176 @@ class TripInProgressFragment :
         }
     }
 
+    private fun defaultInstructionForManeuver(maneuver: ManeuverDirection): String =
+        when (maneuver) {
+            ManeuverDirection.STRAIGHT -> getString(R.string.dashboard_guidance_instruction_straight)
+            ManeuverDirection.SLIGHT_LEFT -> getString(R.string.dashboard_guidance_instruction_slight_left)
+            ManeuverDirection.LEFT -> getString(R.string.dashboard_guidance_instruction_left)
+            ManeuverDirection.SHARP_LEFT -> getString(R.string.dashboard_guidance_instruction_sharp_left)
+            ManeuverDirection.U_TURN -> getString(R.string.dashboard_guidance_instruction_u_turn)
+            ManeuverDirection.SLIGHT_RIGHT -> getString(R.string.dashboard_guidance_instruction_slight_right)
+            ManeuverDirection.RIGHT -> getString(R.string.dashboard_guidance_instruction_right)
+            ManeuverDirection.SHARP_RIGHT -> getString(R.string.dashboard_guidance_instruction_sharp_right)
+            ManeuverDirection.FINISH -> getString(R.string.dashboard_guidance_arrival)
+        }
+
+    private fun shouldUseMapLibrePreview(): Boolean = BuildConfig.MAPLIBRE_STYLE_URL.isNotBlank()
+
+    private fun initializeGuidanceMap(savedInstanceState: Bundle?) {
+        if (!shouldUseMapLibrePreview()) {
+            Log.w(
+                logTag,
+                "Guidance map disabled: MAPLIBRE_STYLE_URL is blank; schematic/map preview will stay hidden"
+            )
+            return
+        }
+        Log.i(logTag, "Guidance map enabled: MAPLIBRE_STYLE_URL=${BuildConfig.MAPLIBRE_STYLE_URL}")
+        if (guidanceMapView == null) {
+            Log.e(logTag, "Guidance map initialization aborted: guidanceMapView is null")
+            return
+        }
+
+        guidanceMapView?.apply {
+            Log.d(
+                logTag,
+                "Guidance map view init: visibility=$visibility, width=$width, height=$height, savedStatePresent=${savedInstanceState?.containsKey(GUIDANCE_MAP_STATE_KEY) == true}"
+            )
+            onCreate(savedInstanceState?.getBundle(GUIDANCE_MAP_STATE_KEY))
+            Log.d(logTag, "Guidance map view onCreate completed")
+            Log.d(logTag, "Requesting guidance map async callback")
+            getMapAsync { map ->
+                guidanceMap = map
+                Log.i(logTag, "Guidance map async callback received")
+                Log.i(logTag, "Initializing guidance map with style ${BuildConfig.MAPLIBRE_STYLE_URL}")
+                map.uiSettings.apply {
+                    setAllGesturesEnabled(false)
+                    isCompassEnabled = false
+                    isAttributionEnabled = false
+                    isLogoEnabled = false
+                }
+                runCatching {
+                    map.setStyle(Style.Builder().fromUri(BuildConfig.MAPLIBRE_STYLE_URL)) {
+                        Log.i(logTag, "Guidance map style loaded successfully")
+                        guidanceMapStyleReady = true
+                        latestGuidanceSnapshot?.let(::applyGuidanceSnapshot)
+                    }
+                }.onFailure { error ->
+                    Log.e(logTag, "Guidance map failed while applying style", error)
+                }
+
+                guidanceMapView?.postDelayed({
+                    if (!guidanceMapStyleReady) {
+                        Log.w(
+                            logTag,
+                            "Guidance map style did not finish loading; preview tiles may be unavailable for ${BuildConfig.MAPLIBRE_STYLE_URL}"
+                        )
+                    }
+                }, 5000L)
+            }
+            post {
+                Log.d(
+                    logTag,
+                    "Guidance map view post-layout: visibility=$visibility, width=$width, height=$height, attachedToWindow=${isAttachedToWindow}"
+                )
+            }
+        }
+    }
+
+    private fun logGuidanceMapRenderSkip(reason: String, snapshot: GuidanceSnapshot? = null) {
+        Log.w(
+            logTag,
+            "Skipping guidance map render: $reason, " +
+                "styleReady=$guidanceMapStyleReady, " +
+                "mapPresent=${guidanceMap != null}, " +
+                "previewPoints=${snapshot?.previewPoints?.size ?: -1}"
+        )
+    }
+
+    private fun renderGuidanceMapPreview(snapshot: GuidanceSnapshot) {
+        val map = guidanceMap ?: run {
+            logGuidanceMapRenderSkip("map instance missing", snapshot)
+            return
+        }
+        if (!guidanceMapStyleReady) {
+            logGuidanceMapRenderSkip("style not ready", snapshot)
+            return
+        }
+        if (snapshot.previewPoints.size < 2) {
+            logGuidanceMapRenderSkip("not enough preview points", snapshot)
+            return
+        }
+
+        runCatching {
+            val latLngs = snapshot.previewPoints.map { LatLng(it.latitude, it.longitude) }
+            val currentIndex = snapshot.previewCurrentIndex.coerceIn(latLngs.indices)
+            val currentLatLng = latLngs[currentIndex]
+            val headingTarget = when {
+                snapshot.previewCueIndex in (currentIndex + 1)..latLngs.lastIndex -> latLngs[snapshot.previewCueIndex]
+                currentIndex < latLngs.lastIndex -> latLngs[currentIndex + 1]
+                else -> currentLatLng
+            }
+
+            map.clear()
+            map.addPolyline(
+                PolylineOptions()
+                    .addAll(latLngs)
+                    .color(Color.WHITE)
+                    .width(5f)
+            )
+            map.moveCamera(
+                CameraUpdateFactory.newCameraPosition(
+                    CameraPosition.Builder()
+                        .target(currentLatLng)
+                        .zoom(16.8)
+                        .bearing(bearingBetween(currentLatLng, headingTarget))
+                        .tilt(0.0)
+                        .build()
+                )
+            )
+        }.onFailure { error ->
+            Log.e(logTag, "Guidance map render failed", error)
+        }
+    }
+
+    private fun bearingBetween(start: LatLng, end: LatLng): Double {
+        val results = FloatArray(2)
+        Location.distanceBetween(
+            start.latitude,
+            start.longitude,
+            end.latitude,
+            end.longitude,
+            results
+        )
+        return results[1].toDouble()
+    }
+
     private fun applyGuidanceSnapshot(snapshot: GuidanceSnapshot?) {
+        latestGuidanceSnapshot = snapshot
         if (!navigationConfig.isNavigation) {
+            Log.d(logTag, "Guidance hidden: navigation mode is disabled")
             guidanceContainer.visibility = GONE
             updateGuidanceBurnInDrift()
             return
         }
         if (snapshot == null) {
+            Log.d(logTag, "Guidance hidden: snapshot is null while navigation mode is active")
             guidanceContainer.visibility = INVISIBLE
             updateGuidanceBurnInDrift()
             return
         }
 
+        Log.d(
+            logTag,
+            "Guidance snapshot received: state=${snapshot.state}, maneuver=${snapshot.maneuver}, routeName=${snapshot.routeName}, matchedPointIndex=${snapshot.matchedPointIndex}, previewPoints=${snapshot.previewPoints.size}, previewCurrentIndex=${snapshot.previewCurrentIndex}, previewCueIndex=${snapshot.previewCueIndex}, engine=${snapshot.engineSource}"
+        )
         guidanceContainer.visibility = VISIBLE
         val guidanceTitle = when (snapshot.state) {
             GuidanceUiState.OFF_ROUTE -> getString(R.string.dashboard_guidance_off_route)
             GuidanceUiState.GPS_WEAK -> getString(R.string.dashboard_guidance_gps_weak)
             GuidanceUiState.ARRIVAL -> getString(R.string.dashboard_guidance_arrival)
-            else -> ""
+            else -> snapshot.instructionText.ifBlank {
+                defaultInstructionForManeuver(snapshot.maneuver)
+            }
         }
         guidanceTitleTextView.text = guidanceTitle
         guidanceTitleTextView.visibility = if (guidanceTitle.isEmpty()) GONE else VISIBLE
@@ -499,16 +706,27 @@ class TripInProgressFragment :
             )
         }
         guidanceDistanceTextView.setTextColor(guidanceAccentColor)
-        guidanceManeuverIcon.setGuidance(snapshot.state, snapshot.maneuver)
+        guidanceManeuverIcon.setGuidance(
+            snapshot.state,
+            snapshot.maneuver,
+            snapshot.turnAngleDegrees
+        )
 
         val showPreview = snapshot.previewPoints.size > 1
-        guidancePreviewView.visibility = if (showPreview) VISIBLE else INVISIBLE
-        if (showPreview) {
-            guidancePreviewView.setPreview(
-                snapshot.previewPoints,
-                snapshot.previewCurrentIndex,
-                snapshot.previewCueIndex
-            )
+        val shouldInitializeMapPreview = showPreview && shouldUseMapLibrePreview()
+        val showMapPreview = shouldInitializeMapPreview && guidanceMapStyleReady
+        Log.d(
+            logTag,
+            "Guidance preview visibility: showPreview=$showPreview, shouldInitializeMapPreview=$shouldInitializeMapPreview, showMapPreview=$showMapPreview, styleReady=$guidanceMapStyleReady, mapAvailable=${guidanceMap != null}, mapViewAvailable=${guidanceMapView != null}"
+        )
+        guidanceMapView?.visibility = when {
+            showMapPreview -> VISIBLE
+            shouldInitializeMapPreview -> INVISIBLE
+            else -> GONE
+        }
+        guidanceRiderOverlay.visibility = if (showMapPreview) VISIBLE else GONE
+        if (showMapPreview) {
+            renderGuidanceMapPreview(snapshot)
         }
         updateGuidanceBurnInDrift()
     }
@@ -536,7 +754,7 @@ class TripInProgressFragment :
     }
 
     private fun stopTripListener(tripId: Long): OnClickListener = OnClickListener {
-        endTrip(tripId)
+        showEndTripConfirmation(tripId)
     }
 
     override fun onDestroy() {
@@ -594,6 +812,7 @@ class TripInProgressFragment :
         initializeMeasurementUpdateObservers()
         initializeWeatherObservers()
         initializeBurnInReduction()
+        initializeGuidanceMap(savedInstanceState)
         viewModel.guidanceSnapshot.observe(viewLifecycleOwner, ::applyGuidanceSnapshot)
     }
 
@@ -643,9 +862,9 @@ class TripInProgressFragment :
         viewModel.location.observe(viewLifecycleOwner) { location ->
             if (navigationConfig.isNavigation) {
                 viewModel.updateNavigation(location)
-                guidanceCompassRow.visibility = if (location.hasBearing()) VISIBLE else INVISIBLE
+                guidanceCompassRow.visibility = VISIBLE
                 guidanceCompassTextView.text = getString(R.string.dashboard_guidance_north_label)
-                guidanceCompassIcon.rotation = -location.bearing
+                guidanceCompassIcon.rotation = if (location.hasBearing()) -location.bearing else 0f
             }
             if (viewModel.speedSensor.value?.rpm == null || circumference == null)
                 topRightView.value =
@@ -839,7 +1058,7 @@ class TripInProgressFragment :
                 else windowInsetsController.show(WindowInsetsCompat.Type.statusBars())
             }
             trackingImage.visibility = if (birEnabled) INVISIBLE else VISIBLE
-            compassImage.visibility = if (birEnabled) INVISIBLE else VISIBLE
+            compassImage.visibility = VISIBLE
             windIcon.visibility = if (birEnabled) INVISIBLE else VISIBLE
             footerView.visibility = if (birEnabled) INVISIBLE else VISIBLE
             footerRightView.visibility = if (birEnabled) INVISIBLE else VISIBLE
@@ -886,7 +1105,12 @@ class TripInProgressFragment :
         guidanceCompassRow = view.findViewById(R.id.dashboard_guidance_compass_row)
         guidanceCompassIcon = view.findViewById(R.id.dashboard_guidance_compass_icon)
         guidanceCompassTextView = view.findViewById(R.id.dashboard_guidance_compass_text)
-        guidancePreviewView = view.findViewById(R.id.dashboard_guidance_preview)
+        guidanceRiderOverlay = view.findViewById(R.id.dashboard_guidance_rider_overlay)
+        guidanceMapView = view.findViewById(R.id.dashboard_guidance_map_preview)
+        Log.d(
+            logTag,
+            "Guidance views initialized: containerPresent=${::guidanceContainer.isInitialized}, mapViewPresent=${guidanceMapView != null}, riderOverlayPresent=${::guidanceRiderOverlay.isInitialized}"
+        )
 
         //TODO: Cleanup below
         //This is a lot of implementation specific initialization
@@ -962,11 +1186,18 @@ class TripInProgressFragment :
 
     override fun onSaveInstanceState(outState: Bundle) {
         viewModel.tripId?.let { outState.putLong("tripId", it) }
+        guidanceMapView?.let { mapView ->
+            val mapBundle = Bundle()
+            mapView.onSaveInstanceState(mapBundle)
+            outState.putBundle(GUIDANCE_MAP_STATE_KEY, mapBundle)
+        }
         super.onSaveInstanceState(outState)
     }
 
     override fun onResume() {
         super.onResume()
+        Log.d(logTag, "TripInProgressFragment onResume: forwarding to guidanceMapView")
+        guidanceMapView?.onResume()
         Log.d(logTag, "Called onResume: currentState = ${viewModel.currentState}")
 
         view?.doOnPreDraw { hideResumeStop() }
@@ -1049,13 +1280,28 @@ class TripInProgressFragment :
 
     override fun onStart() {
         super.onStart()
+        Log.d(logTag, "TripInProgressFragment onStart: forwarding to guidanceMapView")
+        guidanceMapView?.onStart()
         EventBus.getDefault().register(this)
     }
 
     override fun onStop() {
+        Log.d(logTag, "TripInProgressFragment onStop: forwarding to guidanceMapView")
+        guidanceMapView?.onStop()
         super.onStop()
         EventBus.getDefault().unregister(this)
         Log.d(logTag, "onStop")
+    }
+
+    override fun onPause() {
+        Log.d(logTag, "TripInProgressFragment onPause: forwarding to guidanceMapView")
+        guidanceMapView?.onPause()
+        super.onPause()
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        guidanceMapView?.onLowMemory()
     }
 
     override fun onDestroyView() {
@@ -1067,6 +1313,10 @@ class TripInProgressFragment :
             guidanceContainer.translationX = 0f
             guidanceContainer.translationY = 0f
         }
+        guidanceMapView?.onDestroy()
+        guidanceMapView = null
+        guidanceMap = null
+        guidanceMapStyleReady = false
         if (isTimeTickRegistered) context?.unregisterReceiver(timeTickReceiver)
 
         if (viewModel.tripId == null)

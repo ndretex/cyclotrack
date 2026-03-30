@@ -80,13 +80,12 @@ class SchematicGuidanceView @JvmOverloads constructor(
         val maxBehind = abs(transformedPoints.minOf { it.second }).coerceAtLeast(1f)
 
         val horizontalPadding = 12f
-        val topPadding = 8f
-        val bottomPadding = 12f
+        val verticalPadding = 16f
         val riderCenterX = width / 2f
-        val riderCenterY = height - bottomPadding - 22f
+        val riderCenterY = height / 2f
         val scaleX = (width / 2f - horizontalPadding) / maxAbsX
-        val scaleYForward = (riderCenterY - topPadding) / maxAhead
-        val scaleYBackward = (height - riderCenterY - bottomPadding) / maxBehind
+        val scaleYForward = (riderCenterY - verticalPadding) / maxAhead
+        val scaleYBackward = (height - riderCenterY - verticalPadding) / maxBehind
         val scale = min(scaleX, min(scaleYForward, scaleYBackward)).coerceAtLeast(0.2f)
 
         val routePath = Path()

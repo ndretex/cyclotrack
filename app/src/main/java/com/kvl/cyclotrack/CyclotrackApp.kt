@@ -4,11 +4,16 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.net.Uri
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.preference.PreferenceManager
 import androidx.work.Configuration
 import com.google.firebase.analytics.FirebaseAnalytics
 import dagger.hilt.android.HiltAndroidApp
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.maplibre.android.MapLibre
+import org.maplibre.android.module.http.HttpRequestUtil
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -44,6 +49,8 @@ class CyclotrackApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        MapLibre.getInstance(this)
+        configureMapLibreNetworking()
         createNotificationChannel()
         /*PreferenceManager.getDefaultSharedPreferences(this).edit {
             putBoolean(getString(R.string.preference_key_analytics_opt_in_presented),
@@ -53,6 +60,31 @@ class CyclotrackApp : Application(), Configuration.Provider {
         FirebaseAnalytics.getInstance(this).setAnalyticsCollectionEnabled(
             PreferenceManager.getDefaultSharedPreferences(this)
                 .getBoolean(getString(R.string.preferences_key_enable_analytics), false)
+        )
+    }
+
+    private fun configureMapLibreNetworking() {
+        val apiKey = BuildConfig.VALHALLA_API_KEY.trim()
+        val styleHost = Uri.parse(BuildConfig.MAPLIBRE_STYLE_URL.trim()).host?.trim().orEmpty()
+        if (apiKey.isBlank() || styleHost.isBlank()) return
+
+        HttpRequestUtil.setOkHttpClient(
+            OkHttpClient.Builder()
+                .addInterceptor { chain ->
+                    val request = chain.request()
+                    val updatedRequest = if (request.url.host.equals(styleHost, ignoreCase = true)) {
+                        Request.Builder()
+                            .url(request.url)
+                            .headers(request.headers)
+                            .method(request.method, request.body)
+                            .addHeader("x-api-key", apiKey)
+                            .build()
+                    } else {
+                        request
+                    }
+                    chain.proceed(updatedRequest)
+                }
+                .build()
         )
     }
 

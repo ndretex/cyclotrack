@@ -27,7 +27,7 @@ import com.kvl.cyclotrack.data.SensorTypeConverter
         CadenceSpeedMeasurement::class,
         Export::class
     ],
-    version = 29
+    version = 30
 )
 @TypeConverters(
     TimeStateEnumConverter::class,

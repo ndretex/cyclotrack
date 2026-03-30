@@ -8,7 +8,9 @@ import android.graphics.Path
 import android.util.AttributeSet
 import android.view.View
 import kotlin.math.atan2
+import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.min
 import kotlin.math.sin
 
 class ManeuverIconView @JvmOverloads constructor(
@@ -30,13 +32,16 @@ class ManeuverIconView @JvmOverloads constructor(
 
     private var maneuver: ManeuverDirection = ManeuverDirection.STRAIGHT
     private var state: GuidanceUiState = GuidanceUiState.GUIDANCE
+    private var turnAngleDegrees: Double? = null
 
     fun setGuidance(
         state: GuidanceUiState,
         maneuver: ManeuverDirection,
+        turnAngleDegrees: Double? = null,
     ) {
         this.state = state
         this.maneuver = maneuver
+        this.turnAngleDegrees = turnAngleDegrees
         invalidate()
     }
 
@@ -70,67 +75,59 @@ class ManeuverIconView @JvmOverloads constructor(
         strokePaint.color = Color.WHITE
         fillPaint.color = Color.WHITE
 
-        val routePoints = when (maneuver) {
-            ManeuverDirection.STRAIGHT -> listOf(
-                0.5f to 0.88f,
-                0.5f to 0.18f
-            )
-
-            ManeuverDirection.SLIGHT_LEFT -> listOf(
-                0.5f to 0.88f,
-                0.5f to 0.60f,
-                0.44f to 0.40f,
-                0.34f to 0.18f
-            )
-
-            ManeuverDirection.LEFT -> listOf(
-                0.5f to 0.88f,
-                0.5f to 0.58f,
-                0.38f to 0.36f,
-                0.20f to 0.18f
-            )
-
-            ManeuverDirection.SHARP_LEFT -> listOf(
-                0.5f to 0.88f,
-                0.5f to 0.66f,
-                0.44f to 0.50f,
-                0.24f to 0.34f,
-                0.10f to 0.30f
-            )
-
-            ManeuverDirection.SLIGHT_RIGHT -> listOf(
-                0.5f to 0.88f,
-                0.5f to 0.60f,
-                0.56f to 0.40f,
-                0.66f to 0.18f
-            )
-
-            ManeuverDirection.RIGHT -> listOf(
-                0.5f to 0.88f,
-                0.5f to 0.58f,
-                0.62f to 0.36f,
-                0.80f to 0.18f
-            )
-
-            ManeuverDirection.SHARP_RIGHT -> listOf(
-                0.5f to 0.88f,
-                0.5f to 0.66f,
-                0.56f to 0.50f,
-                0.76f to 0.34f,
-                0.90f to 0.30f
-            )
-
-            ManeuverDirection.U_TURN -> listOf(
-                0.5f to 0.88f,
-                0.5f to 0.40f,
-                0.28f to 0.30f,
-                0.28f to 0.64f
-            )
-
-            ManeuverDirection.FINISH -> emptyList()
-        }
+        val routePoints = buildArrowRoute()
 
         drawArrowRoute(canvas, routePoints)
+    }
+
+    private fun buildArrowRoute(): List<Pair<Float, Float>> {
+        val requestedAngle = turnAngleDegrees ?: defaultAngleForManeuver(maneuver)
+        val normalizedAngle = requestedAngle.coerceIn(-175.0, 175.0)
+        val absoluteAngle = abs(normalizedAngle)
+
+        if (absoluteAngle < 12.0) {
+            return listOf(
+                0.5f to 0.88f,
+                0.5f to 0.16f
+            )
+        }
+
+        if (absoluteAngle >= 150.0) {
+            val direction = if (normalizedAngle < 0.0) -1f else 1f
+            return listOf(
+                0.5f to 0.88f,
+                0.5f to 0.54f,
+                (0.5f + 0.18f * direction) to 0.28f,
+                (0.5f + 0.18f * direction) to 0.74f
+            )
+        }
+
+        val pivotX = 0.5f
+        val pivotY = 0.56f
+        val segmentLength = 0.34f
+        val radians = Math.toRadians(normalizedAngle)
+        val endX = (pivotX + sin(radians).toFloat() * segmentLength).coerceIn(0.08f, 0.92f)
+        val endY = (pivotY - cos(radians).toFloat() * segmentLength).coerceIn(0.12f, 0.90f)
+        val controlYOffset = min(0.10f, absoluteAngle.toFloat() / 1000f)
+
+        return listOf(
+            0.5f to 0.88f,
+            0.5f to 0.68f,
+            pivotX to (pivotY + controlYOffset),
+            endX to endY
+        )
+    }
+
+    private fun defaultAngleForManeuver(maneuver: ManeuverDirection): Double = when (maneuver) {
+        ManeuverDirection.STRAIGHT -> 0.0
+        ManeuverDirection.SLIGHT_LEFT -> -35.0
+        ManeuverDirection.LEFT -> -90.0
+        ManeuverDirection.SHARP_LEFT -> -135.0
+        ManeuverDirection.U_TURN -> 180.0
+        ManeuverDirection.SLIGHT_RIGHT -> 35.0
+        ManeuverDirection.RIGHT -> 90.0
+        ManeuverDirection.SHARP_RIGHT -> 135.0
+        ManeuverDirection.FINISH -> 0.0
     }
 
     private fun drawArrowRoute(

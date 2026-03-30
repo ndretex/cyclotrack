@@ -1,6 +1,7 @@
 <resources>
     <string name="app_name">Cyclotrack</string>
     <string name="action_settings">Settings</string>
+    <string name="action_profile">Profile</string>
     <string name="trip_summaries_fragment_label">Trip Summaries Fragment</string>
     <string name="routes_fragment_label">Routes</string>
     <string name="route_details_fragment_label">Route Details</string>
@@ -18,11 +19,11 @@
     <string name="stop_label">STOP</string>
     <string name="resume_label">RESUME</string>
     <string name="label_placeholder">LABEL</string>
-    <string name="start_dashboard_button_description">Touch this button to enter dashboard</string>
     <string name="action_cleanup">Cleanup</string>
     <string name="details_menu_title_edit">Edit</string>
     <string name="details_menu_title_delete">Delete</string>
     <string name="preferences_paired_ble_devices_key">paired_ble_devices</string>
+    <string name="preferences_profile_key">preferences_profile</string>
     <string name="scanning_for_ble_devices">Scanning for BLE devices...</string>
     <string name="saved_devices_label">Linked devices</string>
     <string name="discovered_devices_label">Discovered devices</string>
@@ -217,14 +218,30 @@
     <string name="route_import_error_no_points">The selected file does not contain any route points.</string>
     <string name="route_import_error_no_fit_geometry">This FIT file does not contain route geometry.</string>
     <string name="route_import_source_fit_course">FIT course</string>
-    <string name="route_detail_start_button">Start route</string>
+    <string name="route_detail_start_button">NAVIGATE</string>
     <string name="details_menu_title_rerun_ride">Re-run ride</string>
     <string name="dashboard_guidance_off_route">Off route</string>
     <string name="dashboard_guidance_gps_weak">GPS weak</string>
     <string name="dashboard_guidance_arrival">Destination</string>
+    <string name="dashboard_guidance_instruction_straight">Continue straight</string>
+    <string name="dashboard_guidance_instruction_slight_left">Keep left</string>
+    <string name="dashboard_guidance_instruction_left">Turn left</string>
+    <string name="dashboard_guidance_instruction_sharp_left">Sharp left</string>
+    <string name="dashboard_guidance_instruction_u_turn">Turn around</string>
+    <string name="dashboard_guidance_instruction_slight_right">Keep right</string>
+    <string name="dashboard_guidance_instruction_right">Turn right</string>
+    <string name="dashboard_guidance_instruction_sharp_right">Sharp right</string>
     <string name="dashboard_guidance_remaining_label">Remaining</string>
     <string name="dashboard_guidance_preview_description">Navigation guidance preview</string>
     <string name="dashboard_guidance_maneuver_icon_description">Next maneuver</string>
     <string name="dashboard_guidance_north_label">N</string>
     <string name="dashboard_guidance_north_indicator_description">North indicator</string>
+    <string name="dashboard_guidance_engine_internal">INTERNAL</string>
+    <string name="dashboard_guidance_engine_valhalla">VALHALLA</string>
+    <string name="record_nav_label">Record</string>
+    <string name="record_nav_description">Start recording a new trip</string>
+    <string name="end_trip_confirmation_title">Finish this ride?</string>
+    <string name="end_trip_confirmation_message">Choose whether to save this ride or discard it.</string>
+    <string name="save_trip_action">Save</string>
+    <string name="discard_trip_action">Discard</string>
 </resources>

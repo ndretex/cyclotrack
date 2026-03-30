@@ -13,7 +13,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.preference.PreferenceManager
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.kvl.cyclotrack.databinding.FragmentBiometricsPreferenceBinding
 import com.kvl.cyclotrack.util.dateFormatPattenDob
 import dagger.hilt.android.AndroidEntryPoint
@@ -90,31 +89,24 @@ class BiometricsPreferenceFragment : Fragment() {
             }
         }
 
-        activity?.title = ""
+        activity?.title = getString(R.string.action_profile)
 
         return binding.root
     }
 
     override fun onResume() {
         super.onResume()
-        requireActivity().findViewById<FloatingActionButton>(R.id.fab).apply {
-            visibility = GONE
-        }
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.updateGoogleFitBiometrics()
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        requireActivity().findViewById<FloatingActionButton>(R.id.fab).apply {
-            visibility = VISIBLE
         }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         Log.d(logTag, "onViewCreated")
+        if (requireActivity() is PreferencesActivity) {
+            return
+        }
         requireActivity().addMenuProvider(object : MenuProvider {
             override fun onCreateMenu(menu: Menu, inflater: MenuInflater) {
                 inflater.inflate(R.menu.menu_profile, menu)

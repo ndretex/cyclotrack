@@ -32,7 +32,7 @@ class TripsRepository @Inject constructor(private val tripDao: TripDao) {
         return tripDao.getCleanupTrips()
     }
 
-    fun createNewTrip(bikeId: Long = 1): Long {
+    suspend fun createNewTrip(bikeId: Long = 1): Long {
         return tripDao.save(Trip(bikeId = bikeId))
     }
 

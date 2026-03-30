@@ -14,6 +14,8 @@ Cyclotrack combines a live, in-ride dashboard with post-ride analysis and export
 - Record rides with GPS in a foreground service.
 - Show a live ride dashboard while a trip is in progress.
 - Save ride history locally and review ride details later.
+- Import and save routes from `GPX` and `FIT` files.
+- Start navigation from saved routes or past rides in the existing dashboard.
 - Track bikes and associate rides with equipment.
 - Link BLE heart rate, cadence, and speed sensors.
 - Optionally auto-pause and auto-resume rides.
@@ -42,20 +44,20 @@ The Android app is a single-module Kotlin application built around standard Jetp
 - DI: Hilt
 - Persistence: Room
 - Networking/serialization: OkHttp and Moshi
-- Maps/location: Google Maps and Play Services Location
+- Maps/location: Google Maps, MapLibre, and Play Services Location
 - External services: Google Fit, Strava, Firebase Analytics, Firebase Crashlytics
 
 Key flows in the app:
 
-- `MainActivity`: hosts the main app surface, including analytics and ride summaries.
+- `MainActivity`: hosts the main app surface, including stats, ride history, routes, record entry, and settings access.
 - `DashboardActivity`: hosts the in-ride dashboard.
 - `TripInProgressService`: records trip progress in the foreground.
-- `TripDetailsActivity`: shows ride detail, charts, sync actions, and export actions.
-- `PreferencesActivity`: settings, integrations, bikes, sensors, autopause, and advanced options.
+- `TripDetailsActivity`: shows ride detail, charts, sync actions, export actions, and navigation replay entry points.
+- `PreferencesActivity`: settings, integrations, profile access, bikes, sensors, autopause, and advanced options.
 
 ## Data Model
 
-Cyclotrack persists ride data in a Room database currently at schema version `28`.
+Cyclotrack persists ride data in a Room database currently at schema version `30`.
 
 Main entities include:
 
@@ -64,6 +66,8 @@ Main entities include:
 - `TimeState`
 - `Split`
 - `Bike`
+- `Route`
+- `RoutePoint`
 - `ExternalSensor`
 - `Weather`
 - `HeartRateMeasurement`
@@ -151,6 +155,9 @@ This file is optional. If it is missing, the build falls back to empty strings f
 - `OPENWEATHER_PROD`
 - `STRAVA_CLIENT_ID`
 - `STRAVA_CLIENT_SECRET`
+- `VALHALLA_BASE_URL`
+- `VALHALLA_API_KEY`
+- `MAPLIBRE_STYLE_URL`
 
 Example:
 
@@ -160,6 +167,9 @@ OPENWEATHER_DEV=
 OPENWEATHER_PROD=
 STRAVA_CLIENT_ID=
 STRAVA_CLIENT_SECRET=
+VALHALLA_BASE_URL=
+VALHALLA_API_KEY=
+MAPLIBRE_STYLE_URL=
 ```
 
 `app/google-services.json` is already present in this repository. If you use your own Firebase project, replace it with your own configuration.
@@ -170,7 +180,7 @@ The app defines four build types:
 
 - `debug`: debuggable, application id suffix `.debug`
 - `dev`: debuggable, application id suffix `.dev`
-- `release`: uses `keystore.properties` when present, otherwise debug signing for local builds
+- `release`: debuggable local release build; uses `keystore.properties` when present, otherwise debug signing for local builds
 - `prod`: minified production build; uses `keystore.properties` when present, otherwise debug signing for local builds
 
 The codebase also uses `FeatureFlags` to treat `debug` and `dev` as development builds.

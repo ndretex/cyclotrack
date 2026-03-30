@@ -11,6 +11,9 @@
         android:label="Preferences"
         tools:layout="@layout/fragment_app_preferences">
         <action
+            android:id="@+id/action_edit_profile"
+            app:destination="@id/BiometricsPreferenceFragment" />
+        <action
             android:id="@+id/action_set_dashboard_safe_zone"
             app:destination="@id/DashboardSafeZonePreferenceActivity" />
         <action
@@ -31,6 +34,11 @@
         android:name="com.kvl.cyclotrack.preferences.DashboardSafeZonePreferenceActivity"
         android:label="Dashboard Safe Zone"
         tools:layout="@layout/activity_dashboard_safe_zone_preference" />
+    <fragment
+        android:id="@+id/BiometricsPreferenceFragment"
+        android:name="com.kvl.cyclotrack.BiometricsPreferenceFragment"
+        android:label="@string/action_profile"
+        tools:layout="@layout/fragment_biometrics_preference" />
     <fragment
         android:id="@+id/AdvancedPreferencesFragment"
         android:name="com.kvl.cyclotrack.preferences.AdvancedPreferencesFragment"

@@ -14,9 +14,8 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:layout_marginTop="36dp"
+        android:layout_marginTop="56dp"
         android:layout_marginEnd="8dp"
-        android:background="@drawable/debug_nav_border_container"
         android:gravity="top"
         android:orientation="horizontal"
         android:paddingStart="8dp"
@@ -31,7 +30,6 @@
         <LinearLayout
             android:layout_width="124dp"
             android:layout_height="220dp"
-            android:background="@drawable/debug_nav_border_left_column"
             android:gravity="top|center_horizontal"
             android:orientation="vertical">
 
@@ -39,7 +37,6 @@
                 android:id="@+id/dashboard_guidance_maneuver_icon"
                 android:layout_width="112dp"
                 android:layout_height="112dp"
-                android:background="@drawable/debug_nav_border_maneuver"
                 android:contentDescription="@string/dashboard_guidance_maneuver_icon_description" />
 
             <TextView
@@ -47,7 +44,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:background="@drawable/debug_nav_border_distance"
                 android:fontFamily="@font/orbitron_medium"
                 android:gravity="center_horizontal"
                 android:textColor="#FFFFFF"
@@ -59,7 +55,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:background="@drawable/debug_nav_border_title"
                 android:fontFamily="@font/orbitron_medium"
                 android:gravity="center_horizontal"
                 android:textColor="#FFFFFF"
@@ -73,14 +68,22 @@
             android:layout_width="0dp"
             android:layout_height="220dp"
             android:layout_marginStart="10dp"
-            android:background="@drawable/debug_nav_border_preview"
             android:layout_weight="1">
 
-            <com.kvl.cyclotrack.SchematicGuidanceView
-                android:id="@+id/dashboard_guidance_preview"
+            <org.maplibre.android.maps.MapView
+                android:id="@+id/dashboard_guidance_map_preview"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:contentDescription="@string/dashboard_guidance_preview_description" />
+                android:visibility="gone" />
+
+            <ImageView
+                android:id="@+id/dashboard_guidance_rider_overlay"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_guidance_rider"
+                android:visibility="gone" />
 
             <LinearLayout
                 android:id="@+id/dashboard_guidance_compass_row"
@@ -89,7 +92,6 @@
                 android:layout_gravity="top|end"
                 android:layout_marginTop="6dp"
                 android:layout_marginEnd="6dp"
-                android:background="@drawable/debug_nav_border_compass"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 

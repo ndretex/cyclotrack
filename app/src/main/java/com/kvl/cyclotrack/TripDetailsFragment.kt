@@ -27,6 +27,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Space
+import android.widget.Button
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -117,6 +118,21 @@ class TripDetailsFragment : Fragment(), View.OnTouchListener {
     private lateinit var stravaSyncStatus: GoogleFitSyncStatusEnum
     private var pendingGoogleFitSyncConfirmation = false
     private var pendingExportFileType: String? = null
+
+    private fun navigateTrip() {
+        val navigationConfig = DashboardNavigationConfig(
+            mode = DashboardMode.NAVIGATION,
+            sourceType = NavigationSourceType.TRIP,
+            sourceId = args.tripId
+        )
+        putActiveNavigationSession(requireContext(), navigationConfig)
+        startActivity(
+            createDashboardIntent(
+                requireContext(),
+                navigationConfig = navigationConfig
+            )
+        )
+    }
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
@@ -513,6 +529,9 @@ class TripDetailsFragment : Fragment(), View.OnTouchListener {
 
 
         mapView = view.findViewById(R.id.trip_details_map_view)
+        view.findViewById<Button>(R.id.trip_details_navigate_button).setOnClickListener {
+            navigateTrip()
+        }
         mapView.onCreate(savedInstanceState)
         mapView.getMapAsync {
             Log.d(logTag, "GOT MAP")
@@ -1118,22 +1137,6 @@ class TripDetailsFragment : Fragment(), View.OnTouchListener {
             override fun onMenuItemSelected(item: MenuItem): Boolean {
                 Log.d(logTag, "Options menu clicked")
                 return when (item.itemId) {
-                    R.id.details_menu_action_rerun_ride -> {
-                        val navigationConfig = DashboardNavigationConfig(
-                            mode = DashboardMode.NAVIGATION,
-                            sourceType = NavigationSourceType.TRIP,
-                            sourceId = args.tripId
-                        )
-                        putActiveNavigationSession(requireContext(), navigationConfig)
-                        startActivity(
-                            createDashboardIntent(
-                                requireContext(),
-                                navigationConfig = navigationConfig
-                            )
-                        )
-                        true
-                    }
-
                     R.id.details_menu_action_edit -> {
                         try {
                             findNavController()

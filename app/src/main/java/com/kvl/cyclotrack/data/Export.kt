@@ -12,7 +12,7 @@ import com.kvl.cyclotrack.Trip
         entity = Trip::class,
         parentColumns = arrayOf("id"),
         childColumns = arrayOf("tripId"),
-        onDelete = ForeignKey.NO_ACTION
+        onDelete = ForeignKey.CASCADE
     )],
     indices = [Index(value = ["tripId"])]
 )

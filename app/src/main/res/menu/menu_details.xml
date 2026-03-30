@@ -8,11 +8,6 @@
         android:title="@string/details_menu_title_edit"
         app:showAsAction="ifRoom" />
     <item
-        android:id="@+id/details_menu_action_rerun_ride"
-        android:icon="@drawable/ic_baseline_directions_bike_24"
-        android:title="@string/details_menu_title_rerun_ride"
-        app:showAsAction="ifRoom" />
-    <item
         android:id="@+id/details_menu_action_delete"
         android:title="@string/details_menu_title_delete"
         app:showAsAction="never" />

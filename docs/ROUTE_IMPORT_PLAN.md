@@ -1,8 +1,32 @@
 # Routes, GPX, And FIT Import Architecture Plan
 
-Status: Implemented
+Status: Implemented, with historical planning sections retained
 
 This document supersedes the earlier idea of importing route/activity files directly into the existing `Trip` model as the default V1 approach.
+
+## Current Reality Check
+
+The route domain is now implemented in the app.
+
+The app currently supports:
+
+- a top-level `Routes` screen in the main bottom navigation
+- route import into the dedicated `Route` and `RoutePoint` domain
+- route details with map and derived route stats
+- navigation launch from saved routes
+- navigation replay launch from past rides
+
+The current bottom navigation is:
+
+- `Stats`
+- `Record`
+- `Rides`
+- `Routes`
+- `Settings`
+
+`Profile` is no longer a bottom-nav item. It is now accessed from inside Settings.
+
+The sections below are still useful as architectural rationale, but some phrasing reflects the original implementation plan rather than a future roadmap.
 
 ## Goal
 
@@ -10,9 +34,9 @@ Introduce a separate `Routes` domain for imported or saved planned rides, while 
 
 This should support:
 
-- a new top-level `Routes` screen between `Rides` and `Profile`
+- a top-level `Routes` screen in the main navigation
 - importing `GPX` and `FIT` files into saved routes
-- preserving a clean path for a future navigation feature that can follow either:
+- preserving a clean path for navigation that can follow either:
   - a saved route
   - a previously recorded trip
 
@@ -155,14 +179,14 @@ Both the GPX parser and the FIT parser should map into that shared model, and on
 
 To keep behavior predictable, the first import entry point should be explicit:
 
-- importing from the future `Routes` screen creates a `Route`
+- importing from the `Routes` screen creates a `Route`
 - the selected file may be either `GPX` or `FIT`
 
 A separate future flow may later import a timed activity file as a completed `Trip`, but that should be designed as a distinct feature rather than overloaded into the first route import feature.
 
 ## UI / Navigation Direction
 
-Add a new top-level screen between `Rides` and `Profile`.
+The `Routes` screen is already present as a top-level destination in the main bottom navigation.
 
 Recommended UI label:
 
@@ -178,9 +202,12 @@ Possible alternatives:
 ### Expected Top-Level Navigation
 
 - `Stats`
+- `Record`
 - `Rides`
 - `Routes`
-- `Profile`
+- `Settings`
+
+Profile access lives under Settings.
 
 ### Route Screens
 
@@ -278,6 +305,8 @@ Later, the user may:
 It will help if we plan for optional associations between the two domains without making them the same thing.
 
 ## Recommended Phased Rollout
+
+This phased rollout is now mostly historical because the route domain and its primary UI are already implemented.
 
 ### Phase 1
 

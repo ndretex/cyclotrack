@@ -304,6 +304,16 @@ class AppPreferencesFragment : PreferenceFragmentCompat() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.app_preferences, rootKey)
 
+        findPreference<Preference>(getString(R.string.preferences_profile_key))?.apply {
+            onPreferenceClickListener = Preference.OnPreferenceClickListener {
+                view?.findNavController()?.let {
+                    Log.d(logTag, it.toString())
+                    it.navigate(R.id.action_edit_profile)
+                    true
+                } == true
+            }
+        }
+
         findPreference<Preference>(getString(R.string.preference_key_dashboard_safe_zone))?.apply {
             onPreferenceClickListener = Preference.OnPreferenceClickListener {
                 view?.findNavController()?.let {

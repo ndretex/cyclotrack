@@ -125,10 +125,21 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
-                app:layout_constraintBottom_toTopOf="@id/trip_details_distance"
+                app:layout_constraintBottom_toTopOf="@id/trip_details_navigate_button"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@id/trip_details_title_date" />
+
+            <Button
+                android:id="@+id/trip_details_navigate_button"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/route_detail_start_button"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/trip_details_notes" />
 
             <com.kvl.cyclotrack.widgets.HeadingView
                 android:id="@+id/trip_details_distance"
@@ -139,7 +150,7 @@
                 app:iconSrc="@drawable/ic_ruler"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@id/trip_details_notes" />
+                app:layout_constraintTop_toBottomOf="@id/trip_details_navigate_button" />
 
             <com.kvl.cyclotrack.widgets.HeadingView
                 android:id="@+id/trip_details_time"

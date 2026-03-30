@@ -58,3 +58,4 @@ yarn-error.log*
 .*.sw*
 
 app/src/debug/res/raw/test_db_20230802
+.codex

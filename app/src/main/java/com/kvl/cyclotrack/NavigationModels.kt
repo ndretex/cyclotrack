@@ -41,6 +41,11 @@ enum class GuidanceUiState {
     GPS_WEAK,
 }
 
+enum class NavigationEngineSource {
+    LOCAL,
+    VALHALLA,
+}
+
 data class DashboardNavigationConfig(
     val mode: DashboardMode = DashboardMode.RECORDING,
     val sourceType: NavigationSourceType = NavigationSourceType.NONE,
@@ -64,12 +69,15 @@ data class NavigablePath(
     val points: List<NavigablePoint>,
     val totalDistanceMeters: Double,
     val cues: List<NavigationCue>,
+    val source: NavigationEngineSource = NavigationEngineSource.LOCAL,
 )
 
 data class NavigationCue(
     val maneuver: ManeuverDirection,
     val pointIndex: Int,
     val distanceFromStartMeters: Double,
+    val instructionText: String? = null,
+    val turnAngleDegrees: Double? = null,
 )
 
 data class GuidancePreviewPoint(
@@ -83,6 +91,9 @@ data class GuidanceSnapshot(
     val maneuver: ManeuverDirection,
     val nextCueDistanceMeters: Double?,
     val remainingDistanceMeters: Double,
+    val instructionText: String = "",
+    val engineSource: NavigationEngineSource = NavigationEngineSource.LOCAL,
+    val turnAngleDegrees: Double? = null,
     val previewPoints: List<GuidancePreviewPoint> = emptyList(),
     val previewCurrentIndex: Int = -1,
     val previewCueIndex: Int = -1,

@@ -440,6 +440,50 @@ val MIGRATION_29_28 = object : Migration(29, 28) {
     }
 }
 
+val MIGRATION_29_30 = object : Migration(29, 30) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS `Export_new` (
+            `timestamp` INTEGER NOT NULL,
+            `tripId` INTEGER NOT NULL,
+            `uri` TEXT NOT NULL,
+            `filename` TEXT NOT NULL,
+            `fileType` TEXT NOT NULL,
+            `id` INTEGER NOT NULL PRIMARY KEY,
+            FOREIGN KEY(`tripId`) REFERENCES Trip(`id`) ON DELETE CASCADE)"""
+        )
+        db.execSQL(
+            """INSERT INTO `Export_new` (`timestamp`, `tripId`, `uri`, `filename`, `fileType`, `id`)
+            SELECT `timestamp`, `tripId`, `uri`, `filename`, `fileType`, `id` FROM `Export`"""
+        )
+        db.execSQL("DROP TABLE `Export`")
+        db.execSQL("ALTER TABLE `Export_new` RENAME TO `Export`")
+        db.execSQL("CREATE INDEX index_Export_tripId on Export(`tripId`)")
+    }
+}
+
+val MIGRATION_30_29 = object : Migration(30, 29) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS `Export_old` (
+            `timestamp` INTEGER NOT NULL,
+            `tripId` INTEGER NOT NULL,
+            `uri` TEXT NOT NULL,
+            `filename` TEXT NOT NULL,
+            `fileType` TEXT NOT NULL,
+            `id` INTEGER NOT NULL PRIMARY KEY,
+            FOREIGN KEY(`tripId`) REFERENCES Trip(`id`) ON DELETE NO ACTION)"""
+        )
+        db.execSQL(
+            """INSERT INTO `Export_old` (`timestamp`, `tripId`, `uri`, `filename`, `fileType`, `id`)
+            SELECT `timestamp`, `tripId`, `uri`, `filename`, `fileType`, `id` FROM `Export`"""
+        )
+        db.execSQL("DROP TABLE `Export`")
+        db.execSQL("ALTER TABLE `Export_old` RENAME TO `Export`")
+        db.execSQL("CREATE INDEX index_Export_tripId on Export(`tripId`)")
+    }
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object TripsDatabaseModule {
@@ -480,7 +524,9 @@ object TripsDatabaseModule {
                 MIGRATION_27_28,
                 MIGRATION_28_27,
                 MIGRATION_28_29,
-                MIGRATION_29_28
+                MIGRATION_29_28,
+                MIGRATION_29_30,
+                MIGRATION_30_29
             )
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onOpen(db: SupportSQLiteDatabase) {

@@ -11,7 +11,6 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.core.view.ViewCompat
@@ -20,9 +19,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.findNavController
+import androidx.navigation.ui.NavigationUI
 import androidx.navigation.ui.AppBarConfiguration
 import androidx.navigation.ui.setupActionBarWithNavController
-import androidx.navigation.ui.setupWithNavController
 import androidx.preference.PreferenceManager
 import androidx.work.BackoffPolicy
 import androidx.work.ExistingWorkPolicy
@@ -34,7 +33,6 @@ import com.google.android.gms.common.GooglePlayServicesRepairableException
 import com.google.android.gms.security.ProviderInstaller
 import com.google.android.material.bottomappbar.BottomAppBar
 import com.google.android.material.bottomnavigation.BottomNavigationView
-import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.analytics.logEvent
 import com.kvl.cyclotrack.util.hasFitnessPermissions
@@ -50,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     private val logTag = MainActivity::class.simpleName
     lateinit var googleFitApiService: GoogleFitApiService
     private var newRidesDisabledDialog: AlertDialog? = null
+    private var isStartingTrip = false
     private val viewModel: MainActivityViewModel by viewModels()
 
     private lateinit var startTripHandler: () -> Unit
@@ -135,6 +134,23 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: IllegalArgumentException) {
             Log.d("TRIP_SUMMARIES", "CANNOT HANDLE MULTIPLE TRIP START TOUCHES")
+        }
+    }
+
+    private fun startDashboardForRecording() {
+        if (isStartingTrip) {
+            Log.d(logTag, "Trip start already in progress")
+            return
+        }
+
+        isStartingTrip = true
+        lifecycleScope.launch {
+            try {
+                val tripId = viewModel.latestTrip.value?.takeIf { it.inProgress }?.id
+                startActivity(createDashboardIntent(this@MainActivity, tripId = tripId ?: -1L))
+            } finally {
+                isStartingTrip = false
+            }
         }
     }
 
@@ -252,13 +268,8 @@ class MainActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, true)
         Log.d(logTag, "onCreate")
         title = ""
-        when (intent.getStringExtra("destinationView")) {
-            TripInProgressFragment.toString() -> {
-
-            }
-
-            else -> setContentView(R.layout.activity_main)
-        }
+        setContentView(R.layout.activity_main)
+        Log.d(logTag, "Main layout attached")
         findViewById<com.google.android.material.appbar.AppBarLayout>(R.id.app_bar_main)
             .let { appBar ->
             val initialTopPadding = appBar.paddingTop
@@ -271,12 +282,10 @@ class MainActivity : AppCompatActivity() {
         }
         val bottomAppBar = findViewById<BottomAppBar>(R.id.main_activity_bottomAppBar)
         val bottomNavigationView = findViewById<BottomNavigationView>(R.id.main_activity_bottom_menu)
-        val fab = findViewById<FloatingActionButton>(R.id.fab)
         val navHostFragmentContainer = findViewById<View>(R.id.nav_host_fragment)
         val initialBottomAppBarBottomPadding = bottomAppBar.paddingBottom
         val initialBottomNavTopPadding = bottomNavigationView.paddingTop
         val initialBottomNavBottomPadding = bottomNavigationView.paddingBottom
-        val initialFabBottomMargin = (fab.layoutParams as CoordinatorLayout.LayoutParams).bottomMargin
         var hideTopBarForDestination = false
         val initialNavHostTopPadding = navHostFragmentContainer.paddingTop
         ViewCompat.setOnApplyWindowInsetsListener(navHostFragmentContainer) { view, insets ->
@@ -294,11 +303,6 @@ class MainActivity : AppCompatActivity() {
                 top = initialBottomNavTopPadding + (bottomInset / 2),
                 bottom = initialBottomNavBottomPadding + (bottomInset / 2)
             )
-
-            (fab.layoutParams as? CoordinatorLayout.LayoutParams)?.let { params ->
-                params.bottomMargin = initialFabBottomMargin + bottomInset
-                fab.layoutParams = params
-            }
             insets
         }
         ViewCompat.requestApplyInsets(bottomAppBar)
@@ -306,7 +310,16 @@ class MainActivity : AppCompatActivity() {
         googleFitApiService = GoogleFitApiService(this)
 
         val navController = findNavController(R.id.nav_host_fragment)
-        bottomNavigationView.setupWithNavController(navController)
+        bottomNavigationView.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.action_record_trip -> {
+                    handleFabClick().onClick(bottomNavigationView)
+                    false
+                }
+
+                else -> NavigationUI.onNavDestinationSelected(item, navController)
+            }
+        }
         setupActionBarWithNavController(
             navController,
             AppBarConfiguration(
@@ -314,7 +327,7 @@ class MainActivity : AppCompatActivity() {
                     R.id.AnalyticsFragment,
                     R.id.TripSummariesFragment,
                     R.id.RoutesFragment,
-                    R.id.BiometricsPreferenceFragment
+                    R.id.PreferencesActivity
                 )
             )
         )
@@ -351,21 +364,8 @@ class MainActivity : AppCompatActivity() {
             }.create()
         }
 
-        fab.apply {
-            isEnabled = false
-            visibility = View.INVISIBLE
-            viewModel.latestTrip.observe(this@MainActivity) { trip: Trip? ->
-                startTripHandler = {
-                    findNavController(R.id.nav_host_fragment).navigate(
-                        TripSummariesFragmentDirections.actionStartTrip(
-                            trip?.takeIf { it.inProgress }?.id ?: -1
-                        )
-                    )
-                }
-                isEnabled = true
-                visibility = View.VISIBLE
-                setOnClickListener(handleFabClick())
-            }
+        viewModel.latestTrip.observe(this@MainActivity) {
+            startTripHandler = { startDashboardForRecording() }
         }
 
         lifecycleScope.launch(Dispatchers.IO) {

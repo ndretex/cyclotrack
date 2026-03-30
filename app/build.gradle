@@ -91,12 +91,24 @@ android {
         if (file("../secure.properties").exists()) {
             file("../secure.properties")?.withInputStream { secureProps.load(it) }
         }
+        def escapeBuildConfigString = { value ->
+            "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+        }
         def openMapsVariantApiKey = secureProps.getProperty("OPENWEATHER_DEV") ?: ""
         applicationVariants.configureEach { variant ->
             if (variant.buildType.name == "release" || variant.buildType.name == "prod") {
                 openMapsVariantApiKey = secureProps.getProperty("OPENWEATHER_PROD") ?: ""
             }
         }
+        buildConfigField "String", "VALHALLA_BASE_URL", escapeBuildConfigString(
+                secureProps.getProperty("VALHALLA_BASE_URL") ?: ""
+        )
+        buildConfigField "String", "VALHALLA_API_KEY", escapeBuildConfigString(
+                secureProps.getProperty("VALHALLA_API_KEY") ?: ""
+        )
+        buildConfigField "String", "MAPLIBRE_STYLE_URL", escapeBuildConfigString(
+                secureProps.getProperty("MAPLIBRE_STYLE_URL") ?: ""
+        )
         resValue "string", "maps_api_key", (secureProps.getProperty("MAPS_API_KEY") ?: "")
         resValue "string", "openweather_api_key", (openMapsVariantApiKey)
         resValue "string", "strava_client_id", (secureProps.getProperty("STRAVA_CLIENT_ID") ?: "")
@@ -196,6 +208,7 @@ dependencies {
 
     implementation "androidx.preference:preference-ktx:1.2.1"
     implementation "com.google.code.gson:gson:2.13.1"
+    implementation "org.maplibre.gl:android-sdk:12.1.0"
 
     // requires kotlin plugin update
     implementation platform("com.google.firebase:firebase-bom:33.16.0")

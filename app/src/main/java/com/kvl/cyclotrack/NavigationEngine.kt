@@ -1,10 +1,12 @@
 package com.kvl.cyclotrack
 
 import android.location.Location
+import android.util.Log
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
+private const val NAV_DEBUG_TAG = "NavigationEngine"
 private const val MIN_POINT_SPACING_METERS = 3.0
 private const val MIN_CUE_SPACING_METERS = 25.0
 private const val MIN_SEGMENT_LENGTH_METERS = 6.0
@@ -12,6 +14,11 @@ private const val MIN_TURN_SAMPLE_DELTA_DEGREES = 18.0
 private const val MAX_TURN_CLUSTER_GAP_METERS = 24.0
 private const val OFF_ROUTE_THRESHOLD_METERS = 75.0
 private const val ARRIVAL_THRESHOLD_METERS = 30.0
+private const val LOOP_ROUTE_ENDPOINT_PROXIMITY_THRESHOLD_METERS = 75.0
+private const val LOOP_ROUTE_MIN_PROGRESS_FOR_FINISH = 0.9
+private const val LOOP_ROUTE_INITIAL_MATCH_CAPTURE_RADIUS_METERS = 120.0
+private const val LOOP_ROUTE_INITIAL_MATCH_WINDOW_METERS = 500.0
+private const val NEXT_CUE_LOOKAHEAD_METERS = 1.0
 private const val PREVIEW_DISTANCE_BEHIND_METERS = 20.0
 private const val PREVIEW_DISTANCE_AHEAD_METERS = 140.0
 private const val PREVIEW_MAX_DISTANCE_AHEAD_METERS = 180.0
@@ -37,7 +44,10 @@ private fun buildNavigablePath(
     name: String,
     rawPoints: List<Triple<Double, Double, Double?>>,
 ): NavigablePath? {
-    if (rawPoints.size < 2) return null
+    if (rawPoints.size < 2) {
+        Log.w(NAV_DEBUG_TAG, "buildNavigablePath($name): not enough raw points (${rawPoints.size})")
+        return null
+    }
 
     val navigablePoints = mutableListOf<NavigablePoint>()
     var cumulativeDistance = 0.0
@@ -74,19 +84,32 @@ private fun buildNavigablePath(
         )
     }
 
-    if (navigablePoints.size < 2) return null
+    if (navigablePoints.size < 2) {
+        Log.w(
+            NAV_DEBUG_TAG,
+            "buildNavigablePath($name): not enough filtered points (${navigablePoints.size})"
+        )
+        return null
+    }
 
     val cues = generateNavigationCues(navigablePoints)
+    Log.i(
+        NAV_DEBUG_TAG,
+        "buildNavigablePath($name): rawPoints=${rawPoints.size}, filteredPoints=${navigablePoints.size}, cues=${cues.size}, totalDistanceMeters=${navigablePoints.last().cumulativeDistanceMeters}"
+    )
     return NavigablePath(
         name = name,
         points = navigablePoints,
         totalDistanceMeters = navigablePoints.last().cumulativeDistanceMeters,
-        cues = cues
+        cues = cues,
+        source = NavigationEngineSource.LOCAL
     )
 }
 
 fun initialGuidanceSnapshot(path: NavigablePath): GuidanceSnapshot {
-    val nextCue = path.cues.firstOrNull()
+    val nextCue = path.cues.firstOrNull {
+        it.distanceFromStartMeters > NEXT_CUE_LOOKAHEAD_METERS
+    } ?: path.cues.firstOrNull()
     return buildSnapshot(
         path = path,
         state = GuidanceUiState.GUIDANCE,
@@ -94,7 +117,9 @@ fun initialGuidanceSnapshot(path: NavigablePath): GuidanceSnapshot {
         matchedIndex = 0,
         nextCueDistanceMeters = nextCue?.distanceFromStartMeters,
         remainingDistanceMeters = path.totalDistanceMeters,
-        previewAnchorIndex = nextCue?.pointIndex ?: 0
+        previewAnchorIndex = nextCue?.pointIndex ?: 0,
+        instructionText = nextCue?.instructionText.orEmpty(),
+        turnAngleDegrees = nextCue?.turnAngleDegrees
     )
 }
 
@@ -116,7 +141,11 @@ fun computeGuidanceSnapshot(
         matchedPoint.longitude
     )
 
-    if (remainingDistance <= ARRIVAL_THRESHOLD_METERS) {
+    if (shouldTreatAsArrival(path, location, matchedIndex, remainingDistance)) {
+        Log.d(
+            NAV_DEBUG_TAG,
+            "computeGuidanceSnapshot(${path.name}): ARRIVAL remainingDistance=$remainingDistance, matchedIndex=$matchedIndex"
+        )
         return buildSnapshot(
             path = path,
             state = GuidanceUiState.ARRIVAL,
@@ -129,6 +158,10 @@ fun computeGuidanceSnapshot(
     }
 
     if (location.accuracy > LOCATION_ACCURACY_THRESHOLD * 2f) {
+        Log.d(
+            NAV_DEBUG_TAG,
+            "computeGuidanceSnapshot(${path.name}): GPS_WEAK accuracy=${location.accuracy}, matchedIndex=$matchedIndex"
+        )
         return buildSnapshot(
             path = path,
             state = GuidanceUiState.GPS_WEAK,
@@ -141,6 +174,10 @@ fun computeGuidanceSnapshot(
     }
 
     if (nearestPointDistance > OFF_ROUTE_THRESHOLD_METERS) {
+        Log.d(
+            NAV_DEBUG_TAG,
+            "computeGuidanceSnapshot(${path.name}): OFF_ROUTE nearestPointDistance=$nearestPointDistance, matchedIndex=$matchedIndex"
+        )
         return buildSnapshot(
             path = path,
             state = GuidanceUiState.OFF_ROUTE,
@@ -153,7 +190,7 @@ fun computeGuidanceSnapshot(
     }
 
     val nextCue = path.cues.firstOrNull {
-        it.distanceFromStartMeters > matchedPoint.cumulativeDistanceMeters + 5.0
+        it.distanceFromStartMeters > matchedPoint.cumulativeDistanceMeters + NEXT_CUE_LOOKAHEAD_METERS
     }
     val distanceToNextCue = nextCue?.distanceFromStartMeters?.minus(matchedPoint.cumulativeDistanceMeters)
         ?.coerceAtLeast(0.0)
@@ -177,7 +214,9 @@ fun computeGuidanceSnapshot(
         matchedIndex = matchedIndex,
         nextCueDistanceMeters = distanceToNextCue,
         remainingDistanceMeters = remainingDistance,
-        previewAnchorIndex = nextCue?.pointIndex ?: matchedIndex
+        previewAnchorIndex = nextCue?.pointIndex ?: matchedIndex,
+        instructionText = nextCue?.instructionText.orEmpty(),
+        turnAngleDegrees = nextCue?.turnAngleDegrees
     )
 }
 
@@ -189,6 +228,8 @@ private fun buildSnapshot(
     nextCueDistanceMeters: Double?,
     remainingDistanceMeters: Double,
     previewAnchorIndex: Int,
+    instructionText: String = "",
+    turnAngleDegrees: Double? = null,
 ): GuidanceSnapshot {
     val (startIndex, endIndex, previewCueIndex) = buildPreviewWindow(
         path = path,
@@ -197,6 +238,10 @@ private fun buildSnapshot(
         nextCueDistanceMeters = nextCueDistanceMeters
     )
     val previewPoints = path.points.subList(startIndex, endIndex + 1)
+    Log.v(
+        NAV_DEBUG_TAG,
+        "buildSnapshot(${path.name}): state=$state, matchedIndex=$matchedIndex, previewStart=$startIndex, previewEnd=$endIndex, previewPoints=${previewPoints.size}, previewCueIndex=$previewCueIndex"
+    )
 
     return GuidanceSnapshot(
         state = state,
@@ -204,6 +249,9 @@ private fun buildSnapshot(
         maneuver = maneuver,
         nextCueDistanceMeters = nextCueDistanceMeters,
         remainingDistanceMeters = remainingDistanceMeters,
+        instructionText = instructionText,
+        engineSource = path.source,
+        turnAngleDegrees = turnAngleDegrees,
         previewPoints = previewPoints.map { GuidancePreviewPoint(it.latitude, it.longitude) },
         previewCurrentIndex = matchedIndex - startIndex,
         previewCueIndex = previewCueIndex,
@@ -255,10 +303,20 @@ private fun matchPointIndex(
     location: Location,
     previousMatchedIndex: Int,
 ): Int {
-    val startIndex = if (previousMatchedIndex >= 0) max(0, previousMatchedIndex - 12) else 0
-    val endIndex =
-        if (previousMatchedIndex >= 0) min(path.points.lastIndex, previousMatchedIndex + 160)
-        else path.points.lastIndex
+    val startIndex = if (previousMatchedIndex >= 0) {
+        max(0, previousMatchedIndex - 12)
+    } else {
+        0
+    }
+    val endIndex = when {
+        previousMatchedIndex >= 0 -> min(path.points.lastIndex, previousMatchedIndex + 160)
+        shouldPreferLoopStartWindow(path, location) -> {
+            path.points.indexOfLast {
+                it.cumulativeDistanceMeters <= LOOP_ROUTE_INITIAL_MATCH_WINDOW_METERS
+            }.let { if (it >= 0) it else min(path.points.lastIndex, 160) }
+        }
+        else -> path.points.lastIndex
+    }
 
     var bestIndex = startIndex
     var bestDistance = Double.POSITIVE_INFINITY
@@ -278,6 +336,77 @@ private fun matchPointIndex(
     }
 
     return if (previousMatchedIndex >= 0) max(previousMatchedIndex, bestIndex) else bestIndex
+}
+
+fun isLoopRoute(path: NavigablePath): Boolean {
+    val start = path.points.firstOrNull() ?: return false
+    val end = path.points.lastOrNull() ?: return false
+    return distanceMeters(
+        start.latitude,
+        start.longitude,
+        end.latitude,
+        end.longitude
+    ) <= LOOP_ROUTE_ENDPOINT_PROXIMITY_THRESHOLD_METERS
+}
+
+fun progressFractionAt(path: NavigablePath, pointIndex: Int): Double {
+    if (path.totalDistanceMeters <= 0.0) return 1.0
+    val clampedIndex = pointIndex.coerceIn(path.points.indices)
+    return (path.points[clampedIndex].cumulativeDistanceMeters / path.totalDistanceMeters)
+        .coerceIn(0.0, 1.0)
+}
+
+private fun shouldTreatAsArrival(
+    path: NavigablePath,
+    location: Location,
+    matchedIndex: Int,
+    remainingDistanceMeters: Double,
+): Boolean {
+    if (remainingDistanceMeters > ARRIVAL_THRESHOLD_METERS) return false
+    if (!isLoopRoute(path)) return true
+
+    val progressFraction = progressFractionAt(path, matchedIndex)
+    if (progressFraction < LOOP_ROUTE_MIN_PROGRESS_FOR_FINISH) {
+        Log.d(
+            NAV_DEBUG_TAG,
+            "Suppressing loop arrival for ${path.name}: progressFraction=$progressFraction, matchedIndex=$matchedIndex"
+        )
+        return false
+    }
+
+    val finishPoint = path.points.last()
+    val distanceToFinish = distanceMeters(
+        location.latitude,
+        location.longitude,
+        finishPoint.latitude,
+        finishPoint.longitude
+    )
+    return distanceToFinish <= ARRIVAL_THRESHOLD_METERS
+}
+
+private fun shouldPreferLoopStartWindow(
+    path: NavigablePath,
+    location: Location,
+): Boolean {
+    if (!isLoopRoute(path)) return false
+
+    val startPoint = path.points.first()
+    val finishPoint = path.points.last()
+    val distanceToStart = distanceMeters(
+        location.latitude,
+        location.longitude,
+        startPoint.latitude,
+        startPoint.longitude
+    )
+    val distanceToFinish = distanceMeters(
+        location.latitude,
+        location.longitude,
+        finishPoint.latitude,
+        finishPoint.longitude
+    )
+
+    return distanceToStart <= LOOP_ROUTE_INITIAL_MATCH_CAPTURE_RADIUS_METERS &&
+        distanceToFinish <= LOOP_ROUTE_INITIAL_MATCH_CAPTURE_RADIUS_METERS
 }
 
 private fun generateNavigationCues(points: List<NavigablePoint>): List<NavigationCue> {
@@ -325,7 +454,8 @@ private fun generateNavigationCues(points: List<NavigablePoint>): List<Navigatio
             cues += NavigationCue(
                 maneuver = maneuver,
                 pointIndex = cueSample.index,
-                distanceFromStartMeters = cueSample.distanceFromStartMeters
+                distanceFromStartMeters = cueSample.distanceFromStartMeters,
+                turnAngleDegrees = totalTurnDelta
             )
             lastCueDistance = cueSample.distanceFromStartMeters
         }

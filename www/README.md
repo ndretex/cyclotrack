@@ -1,8 +1,18 @@
-# Cyclotrack web site
+# Cyclotrack Website
 
-This repository is the web site for the Cyclotrack Android app. Source code for this app can be found in kevinvanleer/cyclotrack.
+This directory contains the React website subproject for the Cyclotrack Android app.
 
-Download Cyclotrack from the Google Play Store.
+The repository root also contains the Android application under `app/`. This `www/` folder is only the website and privacy-policy site.
 
-#deploy
-`yarn deploy`
+## Common Commands
+
+From `www/`:
+
+```bash
+yarn start
+yarn build
+yarn test
+yarn deploy
+```
+
+`yarn deploy` publishes the built site with `gh-pages`.

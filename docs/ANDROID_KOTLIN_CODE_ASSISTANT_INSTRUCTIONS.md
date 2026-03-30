@@ -51,7 +51,7 @@ Prefer the existing stack already used in the app:
 - Persistence: Room
 - Background work: WorkManager
 - Networking: OkHttp + Moshi
-- Maps and location: Google Maps and Play Services Location
+- Maps and location: Google Maps, MapLibre, and Play Services Location
 - Integrations: Google Fit, Strava, Firebase Analytics, Firebase Crashlytics
 
 The project also uses some older or mixed patterns that should be respected unless the task explicitly asks to refactor them:
@@ -159,7 +159,7 @@ Cyclotrack has repo-specific build behavior that should be preserved:
 - build types: `debug`, `dev`, `release`, `prod`
 - `debug` and `dev` are treated as development builds in feature-flag logic
 - signing may depend on optional `keystore.properties`
-- API keys and secrets may come from optional `secure.properties`
+- API keys and secrets may come from optional `secure.properties`, including Maps, OpenWeather, Strava, Valhalla, and MapLibre values
 - `BuildConfig.GIT_HASH` is populated from Git during the build
 - the project uses Hilt-integrated WorkManager initialization
 - the project uses a custom instrumentation test runner

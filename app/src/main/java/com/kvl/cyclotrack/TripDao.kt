@@ -83,7 +83,7 @@ data class Biometrics(
 @Dao
 interface TripDao {
     @Insert
-    fun save(trip: Trip): Long
+    suspend fun save(trip: Trip): Long
 
     @Update
     fun update(vararg trips: Trip)
